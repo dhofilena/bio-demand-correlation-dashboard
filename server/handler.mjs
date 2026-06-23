@@ -1,0 +1,123 @@
+import { env } from './config.mjs';
+import { fetchMockDemand } from './adapters/mockDemand.mjs';
+import { fetchTripleWhaleWeekly } from './adapters/tripleWhaleAdapter.mjs';
+import { fetchAmazonSearchWeekly } from './adapters/amazonSearchAdapter.mjs';
+
+// ===========================================================================
+// Demand request handler. Orchestrates the per-source adapters, merges them by
+// week, and reports per-source health so the UI can show live/partial/error.
+// Framework-agnostic: consumed by both the Express server and the Vite dev
+// middleware so there is exactly one code path.
+// ===========================================================================
+
+function mergeByWeek(...sources) {
+  const map = new Map();
+  for (const list of sources) {
+    for (const rec of list ?? []) {
+      const existing = map.get(rec.weekStart) ?? { weekStart: rec.weekStart };
+      map.set(rec.weekStart, { ...existing, ...clean(rec) });
+    }
+  }
+  return [...map.values()].sort((a, b) => a.weekStart.localeCompare(b.weekStart));
+}
+
+// Drop null/undefined so a later source doesn't overwrite a good value with null.
+function clean(rec) {
+  const out = {};
+  for (const [k, v] of Object.entries(rec)) if (v !== null && v !== undefined) out[k] = v;
+  return out;
+}
+
+/**
+ * @param {{start?:string,end?:string,mock?:boolean}} q
+ * @returns {Promise<{status:number, body:object}>}
+ */
+export async function getWeeklyDemand(q) {
+  const end = q.end || new Date().toISOString().slice(0, 10);
+  const start = q.start || new Date(Date.now() - 13 * 7 * 864e5).toISOString().slice(0, 10);
+  const forceMock = q.mock === true || env.DEMAND_DATA_MODE !== 'live';
+
+  const health = [];
+
+  if (forceMock) {
+    return {
+      status: 200,
+      body: {
+        source: 'mock',
+        generatedAt: new Date().toISOString(),
+        weeks: fetchMockDemand(start, end),
+        health: [
+          {
+            id: 'triple-whale',
+            label: 'Triple Whale',
+            status: 'mock',
+            detail: env.TW_API_KEY ? 'Live mode off (DEMAND_DATA_MODE)' : 'No API key configured',
+          },
+          { id: 'amazon-search', label: 'Amazon search', status: 'mock', detail: 'Mock adapter' },
+        ],
+      },
+    };
+  }
+
+  // --- Live mode: each adapter fails independently and falls back to mock. ---
+  let tw = [];
+  try {
+    tw = await fetchTripleWhaleWeekly(start, end);
+    health.push({ id: 'triple-whale', label: 'Triple Whale', status: 'live', detail: `${tw.length} weeks` });
+  } catch (err) {
+    tw = fetchMockDemand(start, end).map((r) => ({
+      weekStart: r.weekStart,
+      weekLabel: r.weekLabel,
+      googleOrganicSessions: r.googleOrganicSessions,
+      directTraffic: r.directTraffic,
+      amazonRevenue: r.amazonRevenue,
+      googlePaidRevenue: r.googlePaidRevenue,
+    }));
+    health.push({ id: 'triple-whale', label: 'Triple Whale', status: 'error', detail: String(err.message || err) });
+  }
+
+  let amazon = [];
+  if (env.AMAZON_ADAPTER === 'custom') {
+    try {
+      amazon = await fetchAmazonSearchWeekly(start, end);
+      health.push({ id: 'amazon-search', label: 'Amazon search', status: 'live', detail: `${amazon.length} weeks` });
+    } catch (err) {
+      amazon = fetchMockDemand(start, end).map((r) => ({ weekStart: r.weekStart, amazonSearchVolume: r.amazonSearchVolume }));
+      health.push({ id: 'amazon-search', label: 'Amazon search', status: 'error', detail: String(err.message || err) });
+    }
+  } else {
+    amazon = fetchMockDemand(start, end).map((r) => ({ weekStart: r.weekStart, amazonSearchVolume: r.amazonSearchVolume }));
+    health.push({ id: 'amazon-search', label: 'Amazon search', status: 'mock', detail: `Adapter: ${env.AMAZON_ADAPTER}` });
+  }
+
+  const degraded = health.some((h) => h.status === 'error');
+  return {
+    status: 200,
+    body: {
+      source: 'triple-whale',
+      generatedAt: new Date().toISOString(),
+      weeks: mergeByWeek(tw, amazon),
+      health,
+      warning: degraded ? 'One or more live sources failed; mock values were substituted.' : undefined,
+    },
+  };
+}
+
+/** connect/express-style middleware for GET /api/triplewhale/weekly. */
+export async function demandMiddleware(req, res) {
+  try {
+    const url = new URL(req.url, 'http://localhost');
+    const { status, body } = await getWeeklyDemand({
+      start: url.searchParams.get('start') || undefined,
+      end: url.searchParams.get('end') || undefined,
+      mock: url.searchParams.get('mock') === 'true',
+    });
+    res.statusCode = status;
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify(body));
+  } catch (err) {
+    res.statusCode = 500;
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({ error: String(err?.message || err) }));
+  }
+}
