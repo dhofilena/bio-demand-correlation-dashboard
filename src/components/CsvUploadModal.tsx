@@ -8,7 +8,7 @@ import {
   type ColumnMapping,
   type ParsedCsv,
 } from '../services/csvIngest';
-import { Upload } from './common/icons';
+import { Upload, Refresh } from './common/icons';
 
 type Step = 'select' | 'map' | 'error';
 
@@ -21,12 +21,15 @@ export function CsvUploadModal({ open, onClose }: { open: boolean; onClose: () =
   const setCsv = useDashboard((s) => s.setCsv);
   const clearCsv = useDashboard((s) => s.clearCsv);
   const csvRecords = useDashboard((s) => s.csvRecords);
+  const csvConnection = useDashboard((s) => s.csvConnection);
+  const connectGoogleSheet = useDashboard((s) => s.connectGoogleSheet);
 
   const [step, setStep] = useState<Step>('select');
   const [parsed, setParsed] = useState<ParsedCsv | null>(null);
   const [mapping, setMapping] = useState<ColumnMapping>({});
   const [error, setError] = useState('');
   const [fileName, setFileName] = useState('');
+  const [sheetLoading, setSheetLoading] = useState(false);
 
   if (!open) return null;
 
@@ -55,7 +58,7 @@ export function CsvUploadModal({ open, onClose }: { open: boolean; onClose: () =
       setStep('error');
       return;
     }
-    setCsv(records);
+    setCsv(records, { label: fileName || 'Uploaded CSV' });
     reset();
     onClose();
   }
@@ -90,9 +93,34 @@ export function CsvUploadModal({ open, onClose }: { open: boolean; onClose: () =
                 <input type="file" accept=".csv,text/csv" style={{ display: 'none' }}
                   onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])} />
               </label>
+
+              <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <button
+                  className="btn"
+                  disabled={sheetLoading || csvConnection.status === 'loading'}
+                  onClick={async () => {
+                    setSheetLoading(true);
+                    try {
+                      const ok = await connectGoogleSheet();
+                      if (ok) onClose();
+                    } finally {
+                      setSheetLoading(false);
+                    }
+                  }}
+                >
+                  <Refresh size={14} />
+                  {sheetLoading || csvConnection.status === 'loading' ? 'Loading Google Sheet…' : 'Load from Google Sheet'}
+                </button>
+                {csvConnection.status === 'connected' && (
+                  <div style={{ fontSize: 12.5, color: 'var(--strong)', fontWeight: 600 }}>
+                    {csvConnection.label} connected · {csvConnection.weekCount} weeks · {csvConnection.detail}
+                  </div>
+                )}
+              </div>
+
               {csvRecords?.length ? (
                 <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5, color: 'var(--text-muted)' }}>
-                  <span>{csvRecords.length} weeks currently loaded from upload.</span>
+                  <span>{csvRecords.length} weeks currently loaded{csvConnection.source === 'upload' ? ' from upload' : ''}.</span>
                   <button className="btn" onClick={() => { clearCsv(); }}>Clear & use demo content</button>
                 </div>
               ) : null}

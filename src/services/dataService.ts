@@ -1,6 +1,7 @@
 import type { DemandApiResponse, SourceHealth, WeeklyRecord } from '../types';
 import { MOCK_WEEKLY } from '../data/mockWeeklyData';
 import { mergeWeekly } from './csvIngest';
+import { normalizeDemandPeriod, weekStartInRange } from '../lib/dateRange';
 
 // Client-side orchestration: pull normalized demand from the secure proxy and
 // merge it with locally-held content (CSV upload, or mock content as fallback)
@@ -20,9 +21,22 @@ const CONTENT_HEALTH: SourceHealth = {
   detail: 'Using bundled demo content',
 };
 
+export function filterRecordsByDateRange(
+  records: WeeklyRecord[],
+  start: string,
+  end: string,
+): WeeklyRecord[] {
+  return records.filter((r) => weekStartInRange(r.weekStart, start, end));
+}
+
 /** Demo mode — everything local, no network. Lets the app run immediately. */
-export function buildDemoDataset(csvRecords: WeeklyRecord[] | null): DatasetResult {
-  const records = csvRecords?.length ? mergeWeekly(MOCK_WEEKLY, csvRecords) : MOCK_WEEKLY;
+export function buildDemoDataset(
+  csvRecords: WeeklyRecord[] | null,
+  start: string,
+  end: string,
+): DatasetResult {
+  const merged = csvRecords?.length ? mergeWeekly(MOCK_WEEKLY, csvRecords) : MOCK_WEEKLY;
+  const records = filterRecordsByDateRange(merged, start, end);
   return {
     records,
     source: 'demo',
@@ -34,9 +48,10 @@ export function buildDemoDataset(csvRecords: WeeklyRecord[] | null): DatasetResu
   };
 }
 
-/** Fetch normalized demand from the proxy. */
+/** Fetch normalized demand from the proxy (full Monday–Sunday weeks). */
 export async function fetchDemand(start: string, end: string, mock = false): Promise<DemandApiResponse> {
-  const params = new URLSearchParams({ start, end });
+  const period = normalizeDemandPeriod(start, end);
+  const params = new URLSearchParams({ start: period.start, end: period.end });
   if (mock) params.set('mock', 'true');
   const res = await fetch(`/api/triplewhale/weekly?${params.toString()}`);
   if (!res.ok) throw new Error(`Demand API error ${res.status}`);
@@ -59,9 +74,7 @@ export async function buildLiveDataset(
 
   // Overlay API demand (partial records) so live demand values win.
   const demandRecords = api.weeks as WeeklyRecord[];
-  const records = mergeWeekly(contentBase, demandRecords).filter((r) =>
-    r.weekStart >= start && r.weekStart <= end,
-  );
+  const records = filterRecordsByDateRange(mergeWeekly(contentBase, demandRecords), start, end);
 
   return {
     records,

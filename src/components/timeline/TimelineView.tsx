@@ -3,12 +3,12 @@ import { useDashboard, type LagSetting } from '../../store/dashboardStore';
 import { METRICS, METRIC_LIST, CONTENT_KEYS, DEMAND_CHANNELS } from '../../config/metrics';
 import type { MetricKey } from '../../types';
 import { lagCorrelation, bestLeadingSignal } from '../../lib/correlation';
-import { generateInsights, timelineAnnotations } from '../../lib/insightEngine';
+import { generateInsights } from '../../lib/insightEngine';
 import { TimelineChart } from './TimelineChart';
 import { InsightBanner } from './InsightBanner';
 import { Dot } from '../common/ui';
 
-const CONTENT_TOGGLES: MetricKey[] = ['influencerPosts', 'instagramPosts', 'tiktokPosts', 'podcastDownloads', 'emv'];
+const CONTENT_TOGGLES: MetricKey[] = ['influencerPosts', 'instagramPosts', 'tiktokPosts', 'podcastImpressions', 'emv'];
 const DEMAND_TOGGLES: MetricKey[] = DEMAND_CHANNELS;
 
 function SeriesChips({ title, keys }: { title: string; keys: MetricKey[] }) {
@@ -77,14 +77,13 @@ export function TimelineView() {
 
   const effectiveLag = lag === 'auto' ? auto.lag : lag;
 
-  const annotations = useMemo(() => timelineAnnotations(records), [records]);
   const insights = useMemo(() => generateInsights(records), [records]);
 
   // Lag explorer mini-readout: influencer→amazon and podcast→organic across 0–2w.
   const explorer = useMemo(() => {
     return [
       lagCorrelation(records, 'influencerPosts', 'amazonSearchVolume'),
-      lagCorrelation(records, 'podcastDownloads', 'googleOrganicSessions'),
+      lagCorrelation(records, 'podcastImpressions', 'googleOrganicSessions'),
     ];
   }, [records]);
 
@@ -118,7 +117,7 @@ export function TimelineView() {
           </span>
         </div>
 
-        <TimelineChart records={records} visibleKeys={visibleKeys} valueMode={valueMode} lag={effectiveLag} annotations={annotations} />
+        <TimelineChart records={records} visibleKeys={visibleKeys} valueMode={valueMode} lag={effectiveLag} />
       </div>
 
       <InsightBanner insights={insights} />

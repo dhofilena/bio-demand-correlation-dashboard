@@ -1,18 +1,44 @@
+import path from 'node:path'
+import os from 'node:os'
 import { defineConfig, loadEnv, type PluginOption } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
+// Keep Vite's pre-bundle cache off OneDrive to avoid EPERM locks on .vite/deps.
+const VITE_CACHE_DIR = path.join(
+  os.homedir(),
+  'AppData',
+  'Local',
+  'vite-cache',
+  'bio-demand-correlation-dashboard',
+)
+
 // Mounts the Triple Whale proxy as dev-server middleware so `npm run dev` is a
 // single command and the API key never reaches the browser. The same handler
 // powers the standalone Express server (server/index.mjs) for production.
-function tripleWhaleDevApi(): PluginOption {
+function demandDevApi(): PluginOption {
   return {
-    name: 'triple-whale-dev-api',
+    name: 'demand-dev-api',
     configureServer(server) {
       server.middlewares.use('/api/triplewhale/weekly', async (req, res) => {
         // @ts-expect-error server handler is plain JS (.mjs) with no type declarations
         const { demandMiddleware } = await import('./server/handler.mjs')
         demandMiddleware(req, res)
+      })
+      server.middlewares.use('/api/sheets/status', async (req, res) => {
+        // @ts-expect-error server handler is plain JS (.mjs) with no type declarations
+        const { sheetsStatusMiddleware } = await import('./server/sheetsHandler.mjs')
+        sheetsStatusMiddleware(req, res)
+      })
+      server.middlewares.use('/api/sheets/csv', async (req, res) => {
+        // @ts-expect-error server handler is plain JS (.mjs) with no type declarations
+        const { sheetsCsvMiddleware } = await import('./server/sheetsHandler.mjs')
+        sheetsCsvMiddleware(req, res)
+      })
+      server.middlewares.use('/api/sheets/bundle', async (req, res) => {
+        // @ts-expect-error server handler is plain JS (.mjs) with no type declarations
+        const { sheetsBundleMiddleware } = await import('./server/sheetsHandler.mjs')
+        sheetsBundleMiddleware(req, res)
       })
     },
   }
@@ -28,6 +54,12 @@ const SERVER_ENV_KEYS = [
   'AMAZON_ADAPTER',
   'AMAZON_API_BASE',
   'AMAZON_API_KEY',
+  'GOOGLE_SHEETS_ENABLED',
+  'GOOGLE_SHEET_ID',
+  'GOOGLE_SHEET_GID',
+  'GOOGLE_SHEET_TABS',
+  'GOOGLE_SERVICE_ACCOUNT_JSON',
+  'GOOGLE_SERVICE_ACCOUNT_KEY_FILE',
 ]
 
 export default defineConfig(({ mode }) => {
@@ -36,6 +68,7 @@ export default defineConfig(({ mode }) => {
     if (env[key] && !process.env[key]) process.env[key] = env[key]
   }
   return {
-    plugins: [react(), tailwindcss(), tripleWhaleDevApi()],
+    cacheDir: VITE_CACHE_DIR,
+    plugins: [react(), tailwindcss(), demandDevApi()],
   }
 })

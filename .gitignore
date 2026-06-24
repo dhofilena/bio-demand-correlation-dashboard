@@ -11,6 +11,7 @@ node_modules
 dist
 dist-ssr
 .env
+secrets/google-service-account.json
 *.local
 .claude
 

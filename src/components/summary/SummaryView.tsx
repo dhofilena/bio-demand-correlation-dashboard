@@ -28,18 +28,11 @@ export function SummaryView() {
     const soft = DEMAND_CHANNELS.map((k) => ({ k, s: sums[k] })).filter(({ s }) => s.status === 'Soft');
 
     const infl = lagCorrelation(records, 'influencerPosts', 'amazonSearchVolume');
-    const pod = lagCorrelation(records, 'podcastDownloads', 'googleOrganicSessions');
-    const paid = sums['googlePaidRevenue'];
-    const organic = sums['googleOrganicSessions'];
-    const direct = sums['directTraffic'];
-    const paidSoftDemandHealthy =
-      paid.status === 'Soft' && ((organic.vsRollingPct ?? 0) > 0 || (direct.vsRollingPct ?? 0) > 0);
+    const pod = lagCorrelation(records, 'podcastImpressions', 'googleOrganicSessions');
 
-    const headline = paidSoftDemandHealthy
-      ? 'Demand signals look healthy. Organic and direct trends suggest interest is rising, while paid softness appears more consistent with delivery constraints than declining intent.'
-      : improved.length
-        ? 'Demand is broadly positive this week, with several channels above their recent baselines and content activity plausibly leading the strongest movers.'
-        : 'Signals are steady this week, tracking close to recent baselines with no major spikes or drops to flag.';
+    const headline = improved.length
+      ? 'Demand is broadly positive this week, with several channels above their recent baselines and content activity plausibly leading the strongest movers.'
+      : 'Signals are steady this week, tracking close to recent baselines with no major spikes or drops to flag.';
 
     const cards: Card[] = [];
 
@@ -56,7 +49,7 @@ export function SummaryView() {
 
     const leadParts: string[] = [];
     if (infl.bestLag >= 1 && infl.r > 0.3) leadParts.push(`influencer posting leads Amazon search by ~${infl.bestLag}w (r=${infl.r.toFixed(2)})`);
-    if (pod.bestLag >= 1 && pod.r > 0.3) leadParts.push(`podcast strength leads organic sessions by ~${pod.bestLag}w (r=${pod.r.toFixed(2)})`);
+    if (pod.bestLag >= 1 && pod.r > 0.3) leadParts.push(`podcast impressions lead organic sessions by ~${pod.bestLag}w (r=${pod.r.toFixed(2)})`);
     cards.push({
       id: 'drove',
       title: 'What likely drove the lift',
@@ -72,13 +65,11 @@ export function SummaryView() {
       id: 'attention',
       title: 'What needs attention',
       accent: 'var(--soft)',
-      confidence: paidSoftDemandHealthy ? 'Medium' : soft.length ? 'Medium' : 'Low',
-      body: paidSoftDemandHealthy
-        ? `Google paid revenue is soft (${formatPct(paid.vsRollingPct)}) while organic and direct hold up — check pacing, budget and impression share before treating it as weak demand.`
-        : soft.length
-          ? `${soft.map(({ k, s }) => `${METRICS[k].label} (${formatPct(s.vsRollingPct)})`).join(', ')} ${soft.length === 1 ? 'is' : 'are'} below baseline.`
-          : 'Nothing is materially below baseline this week.',
-      evidence: paidSoftDemandHealthy ? 'Paid below baseline while two independent demand signals are above it.' : 'Status derived from each channel vs its 4-week baseline.',
+      confidence: soft.length ? 'Medium' : 'Low',
+      body: soft.length
+        ? `${soft.map(({ k, s }) => `${METRICS[k].label} (${formatPct(s.vsRollingPct)})`).join(', ')} ${soft.length === 1 ? 'is' : 'are'} below baseline.`
+        : 'Nothing is materially below baseline this week.',
+      evidence: 'Status derived from each channel vs its 4-week baseline.',
     });
 
     const bestLead = DEMAND_CHANNELS.map((k) => bestLeadingSignal(records, k, CONTENT_KEYS)).filter(Boolean).sort((a, b) => (b!.r) - (a!.r))[0];
@@ -87,11 +78,9 @@ export function SummaryView() {
       title: 'What action to take next',
       accent: 'var(--moderate)',
       confidence: 'Medium',
-      body: paidSoftDemandHealthy
-        ? 'Keep content investment steady — demand is intact. Have the paid team review delivery (pacing/impression share) rather than cutting budget on a demand assumption.'
-        : bestLead
-          ? `Schedule ${METRICS[bestLead.contentKey].label.toLowerCase()} pushes ~${bestLead.bestLag || 1}–2 weeks ahead of key sales moments, since it tends to lead ${METRICS[bestLead.demandKey].label.toLowerCase()}.`
-          : 'Maintain the current content cadence and reassess once another week of data lands.',
+      body: bestLead
+        ? `Schedule ${METRICS[bestLead.contentKey].label.toLowerCase()} pushes ~${bestLead.bestLag || 1}–2 weeks ahead of key sales moments, since it tends to lead ${METRICS[bestLead.demandKey].label.toLowerCase()}.`
+        : 'Maintain the current content cadence and reassess once another week of data lands.',
       evidence: 'Action follows the strongest observed content→demand lead window.',
     });
 
@@ -100,7 +89,7 @@ export function SummaryView() {
       title: 'What to watch (next 1–2 weeks)',
       accent: 'var(--flat)',
       confidence: 'Medium',
-      body: `${infl.bestLag >= 1 ? `Amazon search should be watched for follow-through ~${infl.bestLag}w after recent influencer activity. ` : ''}${pod.bestLag >= 1 ? `Organic sessions may continue reflecting recent podcast strength. ` : ''}Confirm whether paid delivery recovers before drawing demand conclusions.`,
+      body: `${infl.bestLag >= 1 ? `Amazon search should be watched for follow-through ~${infl.bestLag}w after recent influencer activity. ` : ''}${pod.bestLag >= 1 ? `Organic sessions may continue reflecting recent podcast impressions. ` : ''}Watch DTC revenue for confirmation that website demand is following through.`,
       evidence: 'Forward watch items derived from detected lag windows.',
     });
 

@@ -1,22 +1,16 @@
 import { useMemo } from 'react';
 import { useDashboard } from '../../store/dashboardStore';
 import { METRICS, DEMAND_CHANNELS, CONTENT_KEYS } from '../../config/metrics';
-import type { MetricKey } from '../../types';
 import { summarize } from '../../lib/metrics';
 import { bestLeadingSignal } from '../../lib/correlation';
 import { formatValue, formatPct } from '../../lib/format';
 import { StatusBadge, ConfidenceBadge, DeltaPill, Dot, MiniBar } from '../common/ui';
 
 function interpret(
-  key: MetricKey,
   vsRolling: number | null,
   status: string | null,
   leadLabel: string | null,
-  paidContext: { organicUp: boolean; directUp: boolean },
 ): string {
-  if (key === 'googlePaidRevenue' && status === 'Soft' && (paidContext.organicUp || paidContext.directUp)) {
-    return 'Below baseline while organic/direct hold up — pattern fits a delivery or pacing constraint, not falling demand.';
-  }
   if (status === 'Strong' || status === 'Moderate') {
     return leadLabel
       ? `Up ${formatPct(vsRolling)} vs baseline, consistent with ${leadLabel} earlier in the window.`
@@ -30,12 +24,6 @@ export function ScorecardView() {
   const records = useDashboard((s) => s.records);
 
   const rows = useMemo(() => {
-    const organic = summarize(records, 'googleOrganicSessions');
-    const direct = summarize(records, 'directTraffic');
-    const paidContext = {
-      organicUp: (organic.vsRollingPct ?? 0) > 0,
-      directUp: (direct.vsRollingPct ?? 0) > 0,
-    };
     return DEMAND_CHANNELS.map((key) => {
       const s = summarize(records, key);
       const lead = bestLeadingSignal(records, key, CONTENT_KEYS);
@@ -48,7 +36,7 @@ export function ScorecardView() {
         lead,
         leadLabel,
         sparkMax,
-        interpretation: interpret(key, s.vsRollingPct, s.status, leadLabel, paidContext),
+        interpretation: interpret(s.vsRollingPct, s.status, leadLabel),
       };
     });
   }, [records]);

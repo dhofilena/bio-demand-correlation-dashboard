@@ -4,6 +4,7 @@ import {
   CartesianGrid,
   ComposedChart,
   Line,
+  ReferenceArea,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -21,7 +22,6 @@ interface Props {
   visibleKeys: MetricKey[];
   valueMode: ValueMode;
   lag: number; // demand series shifted earlier by this many weeks
-  annotations: { weekStart: string; text: string }[];
 }
 
 interface Row {
@@ -36,7 +36,7 @@ function axisFor(key: MetricKey, records: WeeklyRecord[]): 'big' | 'small' {
   return max > 2000 ? 'big' : 'small';
 }
 
-export function TimelineChart({ records, visibleKeys, valueMode, lag, annotations }: Props) {
+export function TimelineChart({ records, visibleKeys, valueMode, lag }: Props) {
   const { data, perKey, hasBig, hasSmall } = useMemo(() => {
     const seriesByKey = new Map(visibleKeys.map((k) => [k, buildSeries(records, k)]));
 
@@ -65,19 +65,29 @@ export function TimelineChart({ records, visibleKeys, valueMode, lag, annotation
     return { data: rows, perKey: seriesByKey, hasBig, hasSmall };
   }, [records, visibleKeys, valueMode, lag]);
 
-  const annotationLabels = useMemo(() => {
-    const byWeek = new Map(records.map((r) => [r.weekStart, r.weekLabel]));
-    return annotations
-      .map((a) => ({ label: byWeek.get(a.weekStart), text: a.text }))
-      .filter((a): a is { label: string; text: string } => Boolean(a.label));
-  }, [annotations, records]);
-
   const indexed = valueMode === 'indexed';
+
+  const weekBands = useMemo(() => {
+    const BLOCK = 4;
+    return Array.from({ length: Math.ceil(data.length / BLOCK) }, (_, bi) => {
+      const start = bi * BLOCK;
+      const end = Math.min(start + BLOCK - 1, data.length - 1);
+      return {
+        key: String(data[start].weekStart),
+        x1: data[start].weekLabel,
+        x2: data[end].weekLabel,
+        fill: bi % 2 === 0 ? 'var(--surface-2)' : 'transparent',
+      };
+    });
+  }, [data]);
 
   return (
     <div style={{ width: '100%', height: 380, minWidth: 0 }}>
       <ResponsiveContainer width="100%" height="100%" minWidth={0} debounce={50}>
         <ComposedChart data={data} margin={{ top: 18, right: 16, bottom: 4, left: 4 }}>
+          {weekBands.map((band) => (
+            <ReferenceArea key={band.key} x1={band.x1} x2={band.x2} fill={band.fill} strokeOpacity={0} ifOverflow="hidden" />
+          ))}
           <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" vertical={false} />
           <XAxis dataKey="weekLabel" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} tickLine={false} axisLine={{ stroke: 'var(--border)' }} />
           {indexed ? (
@@ -90,11 +100,6 @@ export function TimelineChart({ records, visibleKeys, valueMode, lag, annotation
             </>
           )}
           {indexed && <ReferenceLine y={100} stroke="var(--border-strong)" strokeDasharray="4 4" />}
-
-          {annotationLabels.map((a, i) => (
-            <ReferenceLine key={`${a.label}-${i}`} x={a.label} stroke="var(--accent)" strokeOpacity={0.35} strokeDasharray="2 4"
-              label={{ value: a.text, position: 'top', fontSize: 9.5, fill: 'var(--accent)' }} />
-          ))}
 
           <Tooltip content={<ChartTooltip perKey={perKey} valueMode={valueMode} visibleKeys={visibleKeys} lag={lag} />} />
 
@@ -152,7 +157,7 @@ function ChartTooltip({ active, label, perKey, visibleKeys, valueMode, lag }: To
 
   return (
     <div className="card" style={{ padding: 10, boxShadow: 'var(--shadow-lg)', minWidth: 200 }}>
-      <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>Week of {label}</div>
+      <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>{label}</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
         {rows.map(({ def, point, shifted }) => (
           <div key={def.key} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>

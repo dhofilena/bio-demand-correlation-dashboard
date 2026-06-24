@@ -10,9 +10,9 @@ export const COLORS = {
   emv: '#14b8a6',
   amazonSearch: '#f59e0b',
   organic: '#10b981',
-  direct: '#8b5cf6',
+  nonOrganic: '#8b5cf6',
   amazonRev: '#ef4444',
-  paidRev: '#64748b',
+  dtcRev: '#64748b',
 } as const;
 
 /** Canonical metric registry — drives charts, KPI strip, scorecard and formatting. */
@@ -44,14 +44,14 @@ export const METRICS: Record<MetricKey, MetricDef> = {
     color: '#ec4899',
     description: 'TikTok creator posts.',
   },
-  podcastDownloads: {
-    key: 'podcastDownloads',
-    label: 'Podcast downloads',
+  podcastImpressions: {
+    key: 'podcastImpressions',
+    label: 'Podcast impressions',
     short: 'Podcast',
     group: 'content',
     unit: 'count',
     color: COLORS.podcast,
-    description: 'Podcast & streaming strength (downloads / audio reach via Podscribe).',
+    description: 'Podscribe total impressions (BIOptimizers - TOTALS row in the export).',
   },
   podcastAdSpend: {
     key: 'podcastAdSpend',
@@ -83,23 +83,23 @@ export const METRICS: Record<MetricKey, MetricDef> = {
   },
   googleOrganicSessions: {
     key: 'googleOrganicSessions',
-    label: 'Google organic sessions',
-    short: 'Organic',
+    label: 'Google organic / non-paid sessions',
+    short: 'Google Organic / non-paid',
     group: 'demand',
     unit: 'count',
     color: COLORS.organic,
     isDemandChannel: true,
-    description: 'Organic website sessions (Triple Whale).',
+    description: 'GA4 sessions excluding paid and display channel groups (Triple Whale).',
   },
-  directTraffic: {
-    key: 'directTraffic',
-    label: 'Direct site visits',
-    short: 'Direct',
+  nonOrganicPageViews: {
+    key: 'nonOrganicPageViews',
+    label: 'Non-organic page views',
+    short: 'Non-organic PV',
     group: 'demand',
     unit: 'count',
-    color: COLORS.direct,
+    color: COLORS.nonOrganic,
     isDemandChannel: true,
-    description: 'Direct website visits — a branded-awareness proxy (Triple Whale).',
+    description: 'GA4 page views excluding organic search, social and video channel groups (Triple Whale).',
   },
   amazonRevenue: {
     key: 'amazonRevenue',
@@ -111,39 +111,39 @@ export const METRICS: Record<MetricKey, MetricDef> = {
     isDemandChannel: true,
     description: 'Amazon revenue.',
   },
-  googlePaidRevenue: {
-    key: 'googlePaidRevenue',
-    label: 'Google paid revenue',
-    short: 'Paid rev',
+  dtcRevenue: {
+    key: 'dtcRevenue',
+    label: 'DTC revenue',
+    short: 'DTC rev',
     group: 'demand',
     unit: 'currency',
-    color: COLORS.paidRev,
+    color: COLORS.dtcRev,
     isDemandChannel: true,
-    description: 'Google paid revenue — sensitive to pacing / impression share.',
+    description: 'Website order revenue excluding Amazon (Triple Whale orders_table).',
   },
 };
 
 export const METRIC_LIST: MetricDef[] = Object.values(METRICS);
 
 /** Content signals offered as "leading" candidates in lag analysis. */
-export const CONTENT_KEYS: MetricKey[] = ['influencerPosts', 'podcastDownloads', 'emv'];
+export const CONTENT_KEYS: MetricKey[] = ['influencerPosts', 'podcastImpressions', 'emv'];
 
 /** Demand channels shown in the scorecard, in display order. */
 export const DEMAND_CHANNELS: MetricKey[] = [
   'amazonSearchVolume',
   'googleOrganicSessions',
-  'directTraffic',
+  'nonOrganicPageViews',
   'amazonRevenue',
-  'googlePaidRevenue',
+  'dtcRevenue',
 ];
 
 /** Default KPI strip (max 7). */
 export const KPI_KEYS: MetricKey[] = [
   'influencerPosts',
-  'podcastDownloads',
+  'podcastImpressions',
   'amazonSearchVolume',
   'googleOrganicSessions',
-  'directTraffic',
+  'nonOrganicPageViews',
   'amazonRevenue',
-  'googlePaidRevenue',
+  'dtcRevenue',
 ];
