@@ -14,6 +14,13 @@ import { formatPct } from './format';
 const SPIKE = 12; // % above 4-week baseline considered a spike
 const DROP = -10; // % below 4-week baseline considered a drop
 
+/** Demand channels checked for content-led spikes in section 1. */
+const CONTENT_LED_DEMAND_KEYS: MetricKey[] = [
+  'amazonSearchVolume',
+  'googleOrganicSessions',
+  'dtcRevenue',
+];
+
 function label(key: MetricKey): string {
   return METRICS[key].label;
 }
@@ -57,7 +64,7 @@ export function generateInsights(records: WeeklyRecord[]): Insight[] {
   const lastWeek = records[records.length - 1].weekLabel;
 
   // 1) Content-led lift: a demand channel is up and a content signal led it 1–2 weeks prior.
-  for (const demandKey of ['amazonSearchVolume', 'googleOrganicSessions'] as MetricKey[]) {
+  for (const demandKey of CONTENT_LED_DEMAND_KEYS) {
     const demand = lastWeekState(records, demandKey);
     if (!demand.spiked) continue;
     const lead = bestLeadingSignal(records, demandKey, CONTENT_KEYS);
@@ -84,37 +91,21 @@ export function generateInsights(records: WeeklyRecord[]): Insight[] {
     }
   }
 
-  // 2) Paid delivery vs demand: paid revenue soft while organic + direct healthy.
-  const paid = lastWeekState(records, 'googlePaidRevenue');
-  const organic = lastWeekState(records, 'googleOrganicSessions');
-  const direct = lastWeekState(records, 'directTraffic');
-  if (paid.dropped && (organic.vsRollingPct ?? 0) > 0 && (direct.vsRollingPct ?? 0) > 0) {
-    insights.push({
-      id: 'paid-delivery',
-      kind: 'paid-delivery',
-      confidence: 'Medium',
-      title: 'Paid looks soft, demand looks healthy',
-      text: `Google paid revenue is ${formatPct(paid.vsRollingPct)} vs baseline while organic (${formatPct(
-        organic.vsRollingPct,
-      )}) and direct (${formatPct(direct.vsRollingPct)}) are holding or rising. This pattern is more consistent with a paid delivery constraint — pacing, budget or impression share — than with falling demand.`,
-      evidence: 'Paid below baseline while two independent demand signals are above baseline.',
-    });
-  }
-
-  // 3) Direct traffic + branded awareness.
+  // 2) Non-organic page views + branded awareness.
+  const nonOrganicPv = lastWeekState(records, 'nonOrganicPageViews');
   const emv = lastWeekState(records, 'emv');
-  if (direct.spiked && (emv.vsRollingPct ?? 0) > 0) {
+  if (nonOrganicPv.spiked && (emv.vsRollingPct ?? 0) > 0) {
     insights.push({
-      id: 'direct-awareness',
+      id: 'non-organic-awareness',
       kind: 'demand-strength',
       confidence: 'Medium',
-      title: 'Direct visits rising with awareness',
-      text: `Direct site visits are ${formatPct(direct.vsRollingPct)} vs baseline as earned media value also rose. Rising direct traffic alongside awareness activity is consistent with growing branded interest.`,
-      evidence: 'Direct above baseline coincides with elevated EMV.',
+      title: 'Non-organic page views rising with awareness',
+      text: `Non-organic page views are ${formatPct(nonOrganicPv.vsRollingPct)} vs baseline as earned media value also rose. Rising paid and direct-style traffic alongside awareness activity is consistent with growing branded interest.`,
+      evidence: 'Non-organic page views above baseline coincides with elevated EMV.',
     });
   }
 
-  // 4) Explicit lag callouts (Amazon search vs influencer, organic vs podcast).
+  // 4) Explicit lag callouts (Amazon search vs influencer, organic vs podcast, sessions vs DTC revenue).
   const infl = lagCorrelation(records, 'influencerPosts', 'amazonSearchVolume');
   if (infl.bestLag >= 1 && infl.r > 0.35) {
     insights.push({
@@ -128,17 +119,30 @@ export function generateInsights(records: WeeklyRecord[]): Insight[] {
       evidence: `Best fit at lag ${infl.bestLag}w, r=${infl.r.toFixed(2)}.`,
     });
   }
-  const pod = lagCorrelation(records, 'podcastDownloads', 'googleOrganicSessions');
+  const pod = lagCorrelation(records, 'podcastImpressions', 'googleOrganicSessions');
   if (pod.bestLag >= 1 && pod.r > 0.35) {
     insights.push({
       id: 'lag-podcast-organic',
       kind: 'content-led-lift',
       confidence: pod.confidence,
-      title: 'Podcast strength appears to lead organic sessions',
-      text: `Podcast strength tends to precede Google organic session growth by about ${pod.bestLag} week${
+      title: 'Podcast impressions appear to lead organic sessions',
+      text: `Podcast impressions tend to precede Google organic session growth by about ${pod.bestLag} week${
         pod.bestLag > 1 ? 's' : ''
       }. Treat podcast pushes as an early indicator for organic demand.`,
       evidence: `Best fit at lag ${pod.bestLag}w, r=${pod.r.toFixed(2)}.`,
+    });
+  }
+  const organicDtc = lagCorrelation(records, 'googleOrganicSessions', 'dtcRevenue');
+  if (organicDtc.bestLag >= 1 && organicDtc.r > 0.35) {
+    insights.push({
+      id: 'lag-organic-dtc',
+      kind: 'demand-strength',
+      confidence: organicDtc.confidence,
+      title: 'Organic sessions appear to lead DTC revenue',
+      text: `Google organic sessions tend to precede DTC revenue movement by about ${organicDtc.bestLag} week${
+        organicDtc.bestLag > 1 ? 's' : ''
+      }. Rising website traffic is a useful early read on whether DTC revenue will follow through.`,
+      evidence: `Best fit at lag ${organicDtc.bestLag}w, r=${organicDtc.r.toFixed(2)}.`,
     });
   }
 
@@ -149,32 +153,10 @@ export function generateInsights(records: WeeklyRecord[]): Insight[] {
       kind: 'demand-strength',
       confidence: 'Low',
       title: 'Signals look steady',
-      text: `No spikes or drops crossed the alert thresholds in the week of ${lastWeek}. Demand and content activity are tracking close to their recent baselines.`,
+      text: `No spikes or drops crossed the alert thresholds during ${lastWeek}. Demand and content activity are tracking close to their recent baselines.`,
       evidence: 'All monitored metrics within ±10% of their 4-week baselines.',
     });
   }
 
   return insights;
-}
-
-/**
- * Short factual annotations for the timeline — e.g. "Wk N influencer spike →
- * Amazon search lift in Wk N+L". Lighter-weight than full insights.
- */
-export function timelineAnnotations(records: WeeklyRecord[]): { weekStart: string; text: string }[] {
-  const out: { weekStart: string; text: string }[] = [];
-  const inflPts = buildSeries(records, 'influencerPosts');
-  const podPts = buildSeries(records, 'podcastDownloads');
-
-  inflPts.forEach((p, i) => {
-    if ((p.vsRollingPct ?? 0) >= SPIKE && records[i]) {
-      out.push({ weekStart: p.weekStart, text: `Influencer spike (${formatPct(p.vsRollingPct)})` });
-    }
-  });
-  podPts.forEach((p) => {
-    if ((p.vsRollingPct ?? 0) >= SPIKE) {
-      out.push({ weekStart: p.weekStart, text: `Podcast surge (${formatPct(p.vsRollingPct)})` });
-    }
-  });
-  return out;
 }

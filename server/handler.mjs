@@ -1,4 +1,5 @@
 import { env } from './config.mjs';
+import { normalizeDemandPeriod } from './dates.mjs';
 import { fetchMockDemand } from './adapters/mockDemand.mjs';
 import { fetchTripleWhaleWeekly } from './adapters/tripleWhaleAdapter.mjs';
 import { fetchAmazonSearchWeekly } from './adapters/amazonSearchAdapter.mjs';
@@ -36,6 +37,7 @@ export async function getWeeklyDemand(q) {
   const end = q.end || new Date().toISOString().slice(0, 10);
   const start = q.start || new Date(Date.now() - 13 * 7 * 864e5).toISOString().slice(0, 10);
   const forceMock = q.mock === true || env.DEMAND_DATA_MODE !== 'live';
+  const period = normalizeDemandPeriod(start, end);
 
   const health = [];
 
@@ -45,7 +47,7 @@ export async function getWeeklyDemand(q) {
       body: {
         source: 'mock',
         generatedAt: new Date().toISOString(),
-        weeks: fetchMockDemand(start, end),
+        weeks: fetchMockDemand(period.start, period.end),
         health: [
           {
             id: 'triple-whale',
@@ -62,16 +64,16 @@ export async function getWeeklyDemand(q) {
   // --- Live mode: each adapter fails independently and falls back to mock. ---
   let tw = [];
   try {
-    tw = await fetchTripleWhaleWeekly(start, end);
+    tw = await fetchTripleWhaleWeekly(period.start, period.end);
     health.push({ id: 'triple-whale', label: 'Triple Whale', status: 'live', detail: `${tw.length} weeks` });
   } catch (err) {
-    tw = fetchMockDemand(start, end).map((r) => ({
+    tw = fetchMockDemand(period.start, period.end).map((r) => ({
       weekStart: r.weekStart,
       weekLabel: r.weekLabel,
       googleOrganicSessions: r.googleOrganicSessions,
-      directTraffic: r.directTraffic,
+      nonOrganicPageViews: r.nonOrganicPageViews,
       amazonRevenue: r.amazonRevenue,
-      googlePaidRevenue: r.googlePaidRevenue,
+      dtcRevenue: r.dtcRevenue,
     }));
     health.push({ id: 'triple-whale', label: 'Triple Whale', status: 'error', detail: String(err.message || err) });
   }
@@ -79,14 +81,14 @@ export async function getWeeklyDemand(q) {
   let amazon = [];
   if (env.AMAZON_ADAPTER === 'custom') {
     try {
-      amazon = await fetchAmazonSearchWeekly(start, end);
+      amazon = await fetchAmazonSearchWeekly(period.start, period.end);
       health.push({ id: 'amazon-search', label: 'Amazon search', status: 'live', detail: `${amazon.length} weeks` });
     } catch (err) {
-      amazon = fetchMockDemand(start, end).map((r) => ({ weekStart: r.weekStart, amazonSearchVolume: r.amazonSearchVolume }));
+      amazon = fetchMockDemand(period.start, period.end).map((r) => ({ weekStart: r.weekStart, amazonSearchVolume: r.amazonSearchVolume }));
       health.push({ id: 'amazon-search', label: 'Amazon search', status: 'error', detail: String(err.message || err) });
     }
   } else {
-    amazon = fetchMockDemand(start, end).map((r) => ({ weekStart: r.weekStart, amazonSearchVolume: r.amazonSearchVolume }));
+    amazon = fetchMockDemand(period.start, period.end).map((r) => ({ weekStart: r.weekStart, amazonSearchVolume: r.amazonSearchVolume }));
     health.push({ id: 'amazon-search', label: 'Amazon search', status: 'mock', detail: `Adapter: ${env.AMAZON_ADAPTER}` });
   }
 

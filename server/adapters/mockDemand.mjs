@@ -22,10 +22,9 @@ export function fetchMockDemand(start, end) {
       weekLabel: weekLabel(weekStart),
       amazonSearchVolume: Math.round((9500 + wave * 2500 + i * 250) * noise(3.1)),
       googleOrganicSessions: Math.round((42000 + wave * 6000 + i * 900) * noise(5.3)),
-      directTraffic: Math.round((15000 + i * 650 + wave * 1200) * noise(7.7)),
+      nonOrganicPageViews: Math.round((45000 + i * 1950 + wave * 3600) * noise(7.7)),
       amazonRevenue: Math.round((46000 + wave * 12000 + i * 1500) * noise(2.9)),
-      // Paid drifts down late in the range to mirror the "delivery constraint" story.
-      googlePaidRevenue: Math.round((42000 - Math.max(0, i - 8) * 1800) * noise(4.2)),
+      dtcRevenue: Math.round((52000 + wave * 8000 + i * 1200) * noise(4.2)),
     };
   });
 }

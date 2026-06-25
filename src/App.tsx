@@ -17,7 +17,8 @@ const TABS: { id: TabId; label: string; hint: string }[] = [
 ];
 
 export default function App() {
-  const init = useDashboard((s) => s.init);
+  const bootstrap = useDashboard((s) => s.bootstrap);
+  const connectGoogleSheet = useDashboard((s) => s.connectGoogleSheet);
   const activeTab = useDashboard((s) => s.activeTab);
   const setTab = useDashboard((s) => s.setTab);
   const theme = useDashboard((s) => s.theme);
@@ -31,7 +32,12 @@ export default function App() {
   const [uploadOpen, setUploadOpen] = useState(false);
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
-  useEffect(() => { init(); }, [init]);
+  useEffect(() => {
+    void (async () => {
+      await connectGoogleSheet();
+      await bootstrap();
+    })();
+  }, [bootstrap, connectGoogleSheet]);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark');

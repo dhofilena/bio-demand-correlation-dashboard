@@ -6,23 +6,23 @@
 /** One normalized week. Numeric fields are nullable so partial sources merge cleanly. */
 export interface WeeklyRecord {
   weekStart: string; // ISO date of the Monday, e.g. "2026-03-16"
-  weekLabel: string; // short display label, e.g. "Mar 16"
+  weekLabel: string; // short display label, e.g. "Apr 6 to Apr 12"
   weekNumber: number; // ISO-ish running week index used in the source sheets
 
   // --- Content activity (upstream / leading signals) ---
   influencerPosts: number | null;
   instagramPosts: number | null;
   tiktokPosts: number | null;
-  podcastDownloads: number | null; // podcast strength proxy (downloads / streaming reach)
+  podcastImpressions: number | null; // Podscribe total impressions (BIOptimizers - TOTALS row)
   podcastAdSpend: number | null;
   emv: number | null; // earned media value
 
   // --- Demand outcomes (downstream / lagging signals) ---
   amazonSearchVolume: number | null;
   googleOrganicSessions: number | null;
-  directTraffic: number | null;
+  nonOrganicPageViews: number | null;
   amazonRevenue: number | null;
-  googlePaidRevenue: number | null;
+  dtcRevenue: number | null;
 
   notes?: string;
 }
@@ -32,14 +32,14 @@ export type MetricKey =
   | 'influencerPosts'
   | 'instagramPosts'
   | 'tiktokPosts'
-  | 'podcastDownloads'
+  | 'podcastImpressions'
   | 'podcastAdSpend'
   | 'emv'
   | 'amazonSearchVolume'
   | 'googleOrganicSessions'
-  | 'directTraffic'
+  | 'nonOrganicPageViews'
   | 'amazonRevenue'
-  | 'googlePaidRevenue';
+  | 'dtcRevenue';
 
 export type SignalGroup = 'content' | 'demand';
 export type Unit = 'count' | 'currency' | 'index';
@@ -112,6 +112,26 @@ export interface Insight {
 }
 
 export type DataSourceStatus = 'live' | 'mock' | 'partial' | 'error' | 'loading';
+
+export type CsvConnectionStatus = 'idle' | 'loading' | 'connected' | 'error' | 'disabled';
+export type CsvConnectionSource = 'google-sheets' | 'upload';
+
+export interface CsvSheetTab {
+  gid: string;
+  label: string;
+  weekCount: number;
+  detail: string;
+}
+
+export interface CsvConnection {
+  status: CsvConnectionStatus;
+  source: CsvConnectionSource | null;
+  label: string;
+  weekCount: number;
+  connectedAt: string | null;
+  detail: string;
+  tabs: CsvSheetTab[];
+}
 
 export interface SourceHealth {
   id: string;

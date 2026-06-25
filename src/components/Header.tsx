@@ -1,5 +1,5 @@
 import { useDashboard } from '../store/dashboardStore';
-import type { DataSourceStatus } from '../types';
+import type { CsvConnectionStatus, DataSourceStatus } from '../types';
 import { METRIC_LIST } from '../config/metrics';
 import { Bolt, Download, Info, Moon, Plug, Refresh, Sun, Upload } from './common/icons';
 import { Dot } from './common/ui';
@@ -12,17 +12,116 @@ const STATUS_COLOR: Record<DataSourceStatus, string> = {
   loading: 'var(--moderate)',
 };
 
+const CSV_STATUS_COLOR: Record<CsvConnectionStatus, string> = {
+  connected: 'var(--strong)',
+  loading: 'var(--moderate)',
+  error: 'var(--soft)',
+  disabled: 'var(--flat)',
+  idle: 'var(--flat)',
+};
+
+const alertBannerStyle: React.CSSProperties = {
+  marginTop: 10,
+  padding: '7px 12px',
+  borderRadius: 8,
+  background: 'var(--soft-soft)',
+  color: 'var(--soft)',
+  fontSize: 12.5,
+  fontWeight: 500,
+  lineHeight: 1.45,
+};
+
 function HealthIndicator() {
   const health = useDashboard((s) => s.health);
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
       {health.map((h) => (
-        <span key={h.id} title={`${h.label}: ${h.detail}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-muted)' }}>
+        <span
+          key={h.id}
+          title={h.detail && h.status !== 'error' ? `${h.label}: ${h.detail}` : undefined}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-muted)', flexWrap: 'wrap' }}
+        >
           <Dot color={STATUS_COLOR[h.status]} />
           {h.label}
           <span style={{ color: 'var(--text-faint)', textTransform: 'capitalize' }}>· {h.status}</span>
+          {h.detail && h.status !== 'mock' && h.status !== 'live' && (
+            <span style={{ color: h.status === 'error' ? 'var(--soft)' : 'var(--text-faint)' }}>· {h.detail}</span>
+          )}
         </span>
       ))}
+    </div>
+  );
+}
+
+function CsvConnectionIndicator() {
+  const csvConnection = useDashboard((s) => s.csvConnection);
+  const connectGoogleSheet = useDashboard((s) => s.connectGoogleSheet);
+  const { status, label, weekCount, detail, connectedAt, tabs } = csvConnection;
+  const isConnected = status === 'connected';
+
+  const pillStyle: React.CSSProperties = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 8,
+    padding: '5px 10px',
+    borderRadius: 999,
+    border: `1px solid ${isConnected ? 'color-mix(in srgb, var(--strong) 35%, var(--border))' : 'var(--border)'}`,
+    background: isConnected ? 'color-mix(in srgb, var(--strong) 8%, var(--surface))' : 'var(--surface-2)',
+    fontSize: 12,
+    color: 'var(--text-muted)',
+  };
+
+  if (isConnected && tabs.length > 1) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        {tabs.map((tab) => (
+          <div key={tab.gid} title={`${tab.label}: ${tab.detail}`} style={pillStyle}>
+            <Dot color="var(--strong)" />
+            <span style={{ fontWeight: 600, color: 'var(--text)' }}>{tab.label}</span>
+            <span style={{ color: 'var(--strong)', fontWeight: 600 }}>Connected</span>
+            <span className="nums">· {tab.weekCount} rows</span>
+          </div>
+        ))}
+        <div title={detail} style={{ ...pillStyle, borderStyle: 'dashed' }}>
+          <span className="nums">{weekCount} merged weeks</span>
+          {connectedAt && <span style={{ color: 'var(--text-faint)' }}>· synced {relativeTime(connectedAt)}</span>}
+          <button
+            className="btn"
+            style={{ padding: '2px 8px', fontSize: 11, marginLeft: 2 }}
+            onClick={() => void connectGoogleSheet()}
+            title="Re-fetch all Google Sheet tabs"
+          >
+            <Refresh size={12} />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div title={detail} style={pillStyle}>
+      <Dot color={CSV_STATUS_COLOR[status]} />
+      <span style={{ fontWeight: 600, color: 'var(--text)' }}>{label}</span>
+      {status === 'connected' && (
+        <span style={{ color: 'var(--strong)', fontWeight: 600 }}>Connected</span>
+      )}
+      {status === 'loading' && <span>Connecting…</span>}
+      {status === 'error' && <span style={{ color: 'var(--soft)' }}>Error</span>}
+      {status === 'disabled' && <span>Not configured</span>}
+      {weekCount > 0 && <span className="nums">· {weekCount} weeks</span>}
+      {connectedAt && status === 'connected' && (
+        <span style={{ color: 'var(--text-faint)' }}>· synced {relativeTime(connectedAt)}</span>
+      )}
+      {(status === 'error' || status === 'connected') && (
+        <button
+          className="btn"
+          style={{ padding: '2px 8px', fontSize: 11, marginLeft: 2 }}
+          onClick={() => void connectGoogleSheet()}
+          title="Re-fetch CSV from Google Sheet"
+        >
+          <Refresh size={12} />
+        </button>
+      )}
     </div>
   );
 }
@@ -52,7 +151,8 @@ function exportCsv(records: ReturnType<typeof useDashboard.getState>['records'])
 }
 
 export function Header({ onOpenMethodology, onOpenUpload }: { onOpenMethodology: () => void; onOpenUpload: () => void }) {
-  const { mode, status, lastUpdated, dateRange, theme, records, warning } = useDashboard();
+  const { mode, status, lastUpdated, dateRange, theme, records, warning, health, csvConnection } = useDashboard();
+  const sourceErrors = health.filter((h) => h.status === 'error' && h.detail);
   const connectLive = useDashboard((s) => s.connectLive);
   const useDemo = useDashboard((s) => s.useDemo);
   const refresh = useDashboard((s) => s.refresh);
@@ -79,7 +179,7 @@ export function Header({ onOpenMethodology, onOpenUpload }: { onOpenMethodology:
                 className="nums" style={inputStyle} aria-label="Start date" />
               <span style={{ color: 'var(--text-faint)' }}>→</span>
               <input type="date" value={dateRange.end} onChange={(e) => setDateRange(dateRange.start, e.target.value)}
-                className="nums" style={inputStyle} aria-label="End date" />
+                className="nums" style={inputStyle} aria-label="End date" title="Weeks are Monday–Sunday; demand APIs include through the Sunday of this week" />
             </div>
 
             {mode === 'demo' ? (
@@ -100,13 +200,26 @@ export function Header({ onOpenMethodology, onOpenUpload }: { onOpenMethodology:
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 12, flexWrap: 'wrap' }}>
           <HealthIndicator />
+          <CsvConnectionIndicator />
           <span style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--text-faint)' }}>
             Updated {relativeTime(lastUpdated)} · <span style={{ textTransform: 'capitalize' }}>{mode}</span> mode
           </span>
         </div>
 
-        {warning && (
-          <div style={{ marginTop: 10, padding: '7px 12px', borderRadius: 8, background: 'var(--soft-soft)', color: 'var(--soft)', fontSize: 12.5, fontWeight: 500 }}>
+        {csvConnection.status === 'error' && (
+          <div style={alertBannerStyle}>
+            Google Sheet: {csvConnection.detail}
+          </div>
+        )}
+
+        {sourceErrors.map((h) => (
+          <div key={h.id} style={alertBannerStyle}>
+            <strong>{h.label}</strong>: {h.detail}. Demo values are being used for this source.
+          </div>
+        ))}
+
+        {warning && !sourceErrors.length && (
+          <div style={alertBannerStyle}>
             {warning}
           </div>
         )}
