@@ -1,0 +1,36 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+# API routes — same paths the React app already calls in dev/production.
+[[redirects]]
+  from = "/api/triplewhale/weekly"
+  to = "/.netlify/functions/triplewhale-weekly"
+  status = 200
+
+[[redirects]]
+  from = "/api/sheets/status"
+  to = "/.netlify/functions/sheets-status"
+  status = 200
+
+[[redirects]]
+  from = "/api/sheets/csv"
+  to = "/.netlify/functions/sheets-csv"
+  status = 200
+
+[[redirects]]
+  from = "/api/sheets/bundle"
+  to = "/.netlify/functions/sheets-bundle"
+  status = 200
+
+[[redirects]]
+  from = "/api/health"
+  to = "/.netlify/functions/health"
+  status = 200

@@ -25,3 +25,6 @@ secrets/google-service-account.json
 *.njsproj
 *.sln
 *.sw?
+
+# Local Netlify folder
+.netlify
