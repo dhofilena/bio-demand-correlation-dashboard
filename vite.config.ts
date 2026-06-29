@@ -40,6 +40,11 @@ function demandDevApi(): PluginOption {
         const { sheetsBundleMiddleware } = await import('./server/sheetsHandler.mjs')
         sheetsBundleMiddleware(req, res)
       })
+      server.middlewares.use('/api/sheets/sync', async (req, res) => {
+        // @ts-expect-error server handler is plain JS (.mjs) with no type declarations
+        const { sheetsSyncMiddleware } = await import('./server/sheetsHandler.mjs')
+        sheetsSyncMiddleware(req, res)
+      })
     },
   }
 }
@@ -60,6 +65,7 @@ const SERVER_ENV_KEYS = [
   'GOOGLE_SHEET_TABS',
   'GOOGLE_SERVICE_ACCOUNT_JSON',
   'GOOGLE_SERVICE_ACCOUNT_KEY_FILE',
+  'GOOGLE_SHEETS_CACHE_DIR',
 ]
 
 export default defineConfig(({ mode }) => {

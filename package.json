@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "proxy": "node --env-file=.env server/index.mjs",
+    "sheets:sync": "node --env-file=.env server/syncSheets.mjs",
     "dev:netlify": "netlify dev",
     "typecheck": "tsc -b --noEmit"
   },

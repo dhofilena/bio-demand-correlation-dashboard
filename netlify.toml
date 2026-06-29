@@ -8,6 +8,7 @@
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
+  included_files = ["data/cache/sheets/**"]
 
 # API routes — same paths the React app already calls in dev/production.
 [[redirects]]
@@ -31,6 +32,17 @@
   status = 200
 
 [[redirects]]
+  from = "/api/sheets/sync"
+  to = "/.netlify/functions/sheets-sync"
+  status = 200
+
+[[redirects]]
   from = "/api/health"
   to = "/.netlify/functions/health"
+  status = 200
+
+# SPA fallback — must come after API routes.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
   status = 200

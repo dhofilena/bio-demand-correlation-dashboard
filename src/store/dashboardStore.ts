@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { CsvConnection, MetricKey, SourceHealth, WeeklyRecord } from '../types';
 import { buildDemoDataset, buildLiveDataset } from '../services/dataService';
-import { fetchSheetsStatus, loadWeeklyRecordsFromGoogleSheet } from '../services/sheetsService';
+import { fetchSheetsStatus, loadWeeklyRecordsFromGoogleSheet, syncGoogleSheets } from '../services/sheetsService';
 
 export type TabId = 'timeline' | 'scorecard' | 'summary';
 export type ValueMode = 'absolute' | 'indexed';
@@ -39,6 +39,7 @@ interface DashboardState {
   init: () => void;
   bootstrap: () => Promise<void>;
   connectGoogleSheet: () => Promise<boolean>;
+  syncGoogleSheet: () => Promise<boolean>;
   connectLive: () => Promise<void>;
   useDemo: () => void;
   refresh: () => Promise<void>;
@@ -126,7 +127,7 @@ export const useDashboard = create<DashboardState>((set, get) => ({
       csvConnection: {
         ...s.csvConnection,
         status: 'loading',
-        detail: 'Fetching Google Sheet…',
+        detail: 'Loading cached Google Sheet…',
       },
     }));
 
@@ -147,6 +148,21 @@ export const useDashboard = create<DashboardState>((set, get) => ({
         return false;
       }
 
+      if (!status.cache?.available) {
+        set({
+          csvConnection: {
+            status: 'error',
+            source: 'google-sheets',
+            label: 'Google Sheet',
+            weekCount: 0,
+            connectedAt: null,
+            detail: 'No cached sheet data. Run `npm run sheets:sync` or click Sync from Google in Upload CSV.',
+            tabs: [],
+          },
+        });
+        return false;
+      }
+
       const loaded = await loadWeeklyRecordsFromGoogleSheet();
       const tabCount = loaded.tabs.length;
       const tabSummary = loaded.tabs
@@ -160,7 +176,7 @@ export const useDashboard = create<DashboardState>((set, get) => ({
           label: tabCount > 1 ? `Google Sheets (${tabCount} tabs)` : loaded.tabs[0]?.label ?? 'Google Sheet',
           weekCount: loaded.records.length,
           connectedAt: loaded.fetchedAt,
-          detail: `${loaded.records.length} merged weeks · ${tabSummary}`,
+          detail: `${loaded.records.length} merged weeks · cached · ${tabSummary}`,
           tabs: loaded.tabs.map((t) => ({
             gid: t.gid,
             label: t.label,
@@ -169,7 +185,37 @@ export const useDashboard = create<DashboardState>((set, get) => ({
           })),
         },
       });
+      void get().refresh();
       return true;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      set({
+        csvConnection: {
+          status: 'error',
+          source: 'google-sheets',
+          label: 'Google Sheet',
+          weekCount: 0,
+          connectedAt: null,
+          detail: message,
+          tabs: [],
+        },
+      });
+      return false;
+    }
+  },
+
+  syncGoogleSheet: async () => {
+    set((s) => ({
+      csvConnection: {
+        ...s.csvConnection,
+        status: 'loading',
+        detail: 'Syncing from Google Sheet…',
+      },
+    }));
+
+    try {
+      await syncGoogleSheets();
+      return await get().connectGoogleSheet();
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       set({

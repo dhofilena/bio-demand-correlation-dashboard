@@ -1,6 +1,11 @@
 import express from 'express';
 import { demandMiddleware } from './handler.mjs';
-import { sheetsBundleMiddleware, sheetsCsvMiddleware, sheetsStatusMiddleware } from './sheetsHandler.mjs';
+import {
+  sheetsBundleMiddleware,
+  sheetsCsvMiddleware,
+  sheetsStatusMiddleware,
+  sheetsSyncMiddleware,
+} from './sheetsHandler.mjs';
 
 // Standalone production proxy. The Vite dev server mounts the same handler as
 // middleware (see vite.config.ts), so this is only needed when serving the
@@ -12,6 +17,7 @@ app.get('/api/triplewhale/weekly', demandMiddleware);
 app.get('/api/sheets/status', sheetsStatusMiddleware);
 app.get('/api/sheets/csv', sheetsCsvMiddleware);
 app.get('/api/sheets/bundle', sheetsBundleMiddleware);
+app.post('/api/sheets/sync', sheetsSyncMiddleware);
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 
 app.listen(PORT, () => {

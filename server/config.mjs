@@ -31,6 +31,8 @@ export const env = {
   GOOGLE_SHEET_TABS: process.env.GOOGLE_SHEET_TABS ?? '',
   GOOGLE_SERVICE_ACCOUNT_JSON: process.env.GOOGLE_SERVICE_ACCOUNT_JSON ?? '',
   GOOGLE_SERVICE_ACCOUNT_KEY_FILE: process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE ?? '',
+  /** Local CSV cache directory (default: data/cache/sheets under project root). */
+  GOOGLE_SHEETS_CACHE_DIR: process.env.GOOGLE_SHEETS_CACHE_DIR ?? '',
 };
 
 /**
