@@ -55,7 +55,7 @@ function HealthIndicator() {
 
 function CsvConnectionIndicator() {
   const csvConnection = useDashboard((s) => s.csvConnection);
-  const connectGoogleSheet = useDashboard((s) => s.connectGoogleSheet);
+  const syncGoogleSheet = useDashboard((s) => s.syncGoogleSheet);
   const { status, label, weekCount, detail, connectedAt, tabs } = csvConnection;
   const isConnected = status === 'connected';
 
@@ -88,8 +88,8 @@ function CsvConnectionIndicator() {
           <button
             className="btn"
             style={{ padding: '2px 8px', fontSize: 11, marginLeft: 2 }}
-            onClick={() => void connectGoogleSheet()}
-            title="Re-fetch all Google Sheet tabs"
+            onClick={() => void syncGoogleSheet()}
+            title="Sync fresh CSV from Google (writes local cache)"
           >
             <Refresh size={12} />
           </button>
@@ -105,7 +105,7 @@ function CsvConnectionIndicator() {
       {status === 'connected' && (
         <span style={{ color: 'var(--strong)', fontWeight: 600 }}>Connected</span>
       )}
-      {status === 'loading' && <span>Connecting…</span>}
+      {status === 'loading' && <span>Loading…</span>}
       {status === 'error' && <span style={{ color: 'var(--soft)' }}>Error</span>}
       {status === 'disabled' && <span>Not configured</span>}
       {weekCount > 0 && <span className="nums">· {weekCount} weeks</span>}
@@ -116,8 +116,8 @@ function CsvConnectionIndicator() {
         <button
           className="btn"
           style={{ padding: '2px 8px', fontSize: 11, marginLeft: 2 }}
-          onClick={() => void connectGoogleSheet()}
-          title="Re-fetch CSV from Google Sheet"
+          onClick={() => void syncGoogleSheet()}
+          title="Sync fresh CSV from Google (updates local cache)"
         >
           <Refresh size={12} />
         </button>

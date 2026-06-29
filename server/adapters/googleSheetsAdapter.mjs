@@ -10,6 +10,11 @@ import { env, getGoogleSheetTabs } from '../config.mjs';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const SHEETS_SCOPE = 'https://www.googleapis.com/auth/spreadsheets.readonly';
 const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.readonly';
+const FETCH_TIMEOUT_MS = 45_000;
+
+function fetchWithTimeout(url, options = {}) {
+  return fetch(url, { ...options, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+}
 
 function loadServiceAccount() {
   if (env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE) {
@@ -44,7 +49,7 @@ async function getAccessToken(serviceAccount) {
   const signature = sign.sign(serviceAccount.private_key, 'base64url');
   const jwt = `${unsigned}.${signature}`;
 
-  const res = await fetch(TOKEN_URL, {
+  const res = await fetchWithTimeout(TOKEN_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -78,7 +83,7 @@ function valuesToCsv(values) {
 }
 
 async function resolveSheetTitle(spreadsheetId, gid, accessToken) {
-  const res = await fetch(
+  const res = await fetchWithTimeout(
     `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?fields=sheets(properties(sheetId,title))`,
     { headers: { Authorization: `Bearer ${accessToken}` } },
   );
@@ -97,7 +102,7 @@ async function resolveSheetTitle(spreadsheetId, gid, accessToken) {
 
 async function fetchViaExportUrl(spreadsheetId, gid, accessToken) {
   const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&gid=${gid}`;
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+  const res = await fetchWithTimeout(url, { headers: { Authorization: `Bearer ${accessToken}` } });
   if (!res.ok) {
     const detail = await res.text();
     throw new Error(`Sheet export failed (${res.status}): ${detail.slice(0, 240)}`);
@@ -108,7 +113,7 @@ async function fetchViaExportUrl(spreadsheetId, gid, accessToken) {
 async function fetchViaSheetsApi(spreadsheetId, gid, accessToken) {
   const title = await resolveSheetTitle(spreadsheetId, gid, accessToken);
   const range = encodeURIComponent(`${title}!A:ZZ`);
-  const res = await fetch(
+  const res = await fetchWithTimeout(
     `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}`,
     { headers: { Authorization: `Bearer ${accessToken}` } },
   );
@@ -189,11 +194,12 @@ export async function fetchAllGoogleSheetTabs() {
   const spreadsheetId = env.GOOGLE_SHEET_ID;
   const fetchedAt = new Date().toISOString();
 
-  const tabs = [];
-  for (const tab of configuredTabs) {
-    const { csv, rowCount } = await fetchTabCsv(spreadsheetId, tab.gid, accessToken);
-    tabs.push({ gid: tab.gid, label: tab.label, format: tab.format, csv, rowCount });
-  }
+  const tabs = await Promise.all(
+    configuredTabs.map(async (tab) => {
+      const { csv, rowCount } = await fetchTabCsv(spreadsheetId, tab.gid, accessToken);
+      return { gid: tab.gid, label: tab.label, format: tab.format, csv, rowCount };
+    }),
+  );
 
   return { spreadsheetId, tabs, fetchedAt };
 }

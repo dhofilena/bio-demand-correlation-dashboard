@@ -34,8 +34,8 @@ export default function App() {
 
   useEffect(() => {
     void (async () => {
-      await connectGoogleSheet();
-      await bootstrap();
+      const loaded = await connectGoogleSheet();
+      if (!loaded) await bootstrap();
     })();
   }, [bootstrap, connectGoogleSheet]);
 

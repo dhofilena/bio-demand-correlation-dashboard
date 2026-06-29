@@ -12,6 +12,13 @@ export interface SheetsStatusResponse {
   configured: boolean;
   sheetId: string | null;
   tabs: SheetTabConfig[];
+  cache?: {
+    available: boolean;
+    lastSync: string | null;
+    tabCount: number;
+    spreadsheetId: string | null;
+    cacheDir: string;
+  };
   error?: string;
 }
 
@@ -34,7 +41,16 @@ export interface SheetsLoadResult {
 interface SheetsBundleResponse {
   spreadsheetId: string;
   fetchedAt: string;
+  source?: 'cache' | 'live';
   tabs: { gid: string; label: string; format?: CsvSheetFormat; csv: string; rowCount: number }[];
+}
+
+export interface SheetsSyncResponse {
+  ok: boolean;
+  fetchedAt: string;
+  source: 'live';
+  tabs: { gid: string; label: string; rowCount: number }[];
+  cache: NonNullable<SheetsStatusResponse['cache']>;
 }
 
 export async function fetchSheetsStatus(): Promise<SheetsStatusResponse> {
@@ -71,7 +87,7 @@ async function parseTabCsv(
 export async function loadWeeklyRecordsFromGoogleSheet(): Promise<SheetsLoadResult> {
   const res = await fetch('/api/sheets/bundle');
   if (!res.ok) {
-    let detail = `Google Sheet fetch failed (${res.status})`;
+    let detail = `Cached Google Sheet load failed (${res.status})`;
     try {
       const json = (await res.json()) as { error?: string };
       if (json.error) detail = json.error;
@@ -103,4 +119,20 @@ export async function loadWeeklyRecordsFromGoogleSheet(): Promise<SheetsLoadResu
     mappedColumns,
     tabs: loadedTabs,
   };
+}
+
+/** Pull fresh CSV from Google and write the local cache (can fail with 502). */
+export async function syncGoogleSheets(): Promise<SheetsSyncResponse> {
+  const res = await fetch('/api/sheets/sync', { method: 'POST' });
+  if (!res.ok) {
+    let detail = `Google Sheet sync failed (${res.status})`;
+    try {
+      const json = (await res.json()) as { error?: string };
+      if (json.error) detail = json.error;
+    } catch {
+      // response was not JSON
+    }
+    throw new Error(detail);
+  }
+  return (await res.json()) as SheetsSyncResponse;
 }

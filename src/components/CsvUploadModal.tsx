@@ -22,14 +22,14 @@ export function CsvUploadModal({ open, onClose }: { open: boolean; onClose: () =
   const clearCsv = useDashboard((s) => s.clearCsv);
   const csvRecords = useDashboard((s) => s.csvRecords);
   const csvConnection = useDashboard((s) => s.csvConnection);
-  const connectGoogleSheet = useDashboard((s) => s.connectGoogleSheet);
+  const syncGoogleSheet = useDashboard((s) => s.syncGoogleSheet);
 
   const [step, setStep] = useState<Step>('select');
   const [parsed, setParsed] = useState<ParsedCsv | null>(null);
   const [mapping, setMapping] = useState<ColumnMapping>({});
   const [error, setError] = useState('');
   const [fileName, setFileName] = useState('');
-  const [sheetLoading, setSheetLoading] = useState(false);
+  const [syncLoading, setSyncLoading] = useState(false);
 
   if (!open) return null;
 
@@ -96,21 +96,24 @@ export function CsvUploadModal({ open, onClose }: { open: boolean; onClose: () =
 
               <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <button
-                  className="btn"
-                  disabled={sheetLoading || csvConnection.status === 'loading'}
+                  className="btn btn-primary"
+                  disabled={syncLoading || csvConnection.status === 'loading'}
                   onClick={async () => {
-                    setSheetLoading(true);
+                    setSyncLoading(true);
                     try {
-                      const ok = await connectGoogleSheet();
+                      const ok = await syncGoogleSheet();
                       if (ok) onClose();
                     } finally {
-                      setSheetLoading(false);
+                      setSyncLoading(false);
                     }
                   }}
                 >
                   <Refresh size={14} />
-                  {sheetLoading || csvConnection.status === 'loading' ? 'Loading Google Sheet…' : 'Load from Google Sheet'}
+                  {syncLoading || csvConnection.status === 'loading' ? 'Syncing from Google…' : 'Sync from Google Sheet'}
                 </button>
+                <p style={{ margin: 0, fontSize: 12, color: 'var(--text-faint)', lineHeight: 1.45 }}>
+                  The dashboard loads from a local CSV cache on startup. Sync pulls the latest sheet data from Google and updates that cache.
+                </p>
                 {csvConnection.status === 'connected' && (
                   <div style={{ fontSize: 12.5, color: 'var(--strong)', fontWeight: 600 }}>
                     {csvConnection.label} connected · {csvConnection.weekCount} weeks · {csvConnection.detail}
