@@ -27,7 +27,7 @@ export function SummaryView() {
       .sort((a, b) => (b.s.vsRollingPct ?? 0) - (a.s.vsRollingPct ?? 0));
     const soft = DEMAND_CHANNELS.map((k) => ({ k, s: sums[k] })).filter(({ s }) => s.status === 'Soft');
 
-    const infl = lagCorrelation(records, 'influencerPosts', 'amazonSearchVolume');
+    const infl = lagCorrelation(records, 'profilePosted', 'amazonOrganicRevenue');
     const pod = lagCorrelation(records, 'podcastImpressions', 'googleOrganicSessions');
 
     const headline = improved.length
@@ -48,7 +48,7 @@ export function SummaryView() {
     });
 
     const leadParts: string[] = [];
-    if (infl.bestLag >= 1 && infl.r > 0.3) leadParts.push(`influencer posting leads Amazon search by ~${infl.bestLag}w (r=${infl.r.toFixed(2)})`);
+    if (infl.bestLag >= 1 && infl.r > 0.3) leadParts.push(`influencer posting leads Amazon organic revenue by ~${infl.bestLag}w (r=${infl.r.toFixed(2)})`);
     if (pod.bestLag >= 1 && pod.r > 0.3) leadParts.push(`podcast impressions lead organic sessions by ~${pod.bestLag}w (r=${pod.r.toFixed(2)})`);
     cards.push({
       id: 'drove',
@@ -58,7 +58,7 @@ export function SummaryView() {
       body: leadParts.length
         ? `Within this window, ${leadParts.join(' and ')}. These are lagged correlations that support planning, not proof of causation.`
         : 'No content signal shows a strong leading relationship with demand in this window.',
-      evidence: 'Lagged correlation across 0–2 week windows for the standard content→demand pairs.',
+      evidence: 'Lagged correlation across 0–4 week windows for the standard content→demand pairs.',
     });
 
     cards.push({
@@ -89,7 +89,7 @@ export function SummaryView() {
       title: 'What to watch (next 1–2 weeks)',
       accent: 'var(--flat)',
       confidence: 'Medium',
-      body: `${infl.bestLag >= 1 ? `Amazon search should be watched for follow-through ~${infl.bestLag}w after recent influencer activity. ` : ''}${pod.bestLag >= 1 ? `Organic sessions may continue reflecting recent podcast impressions. ` : ''}Watch DTC revenue for confirmation that website demand is following through.`,
+      body: `${infl.bestLag >= 1 ? `Amazon organic revenue should be watched for follow-through ~${infl.bestLag}w after recent influencer activity. ` : ''}${pod.bestLag >= 1 ? `Organic sessions may continue reflecting recent podcast impressions. ` : ''}Watch DTC revenue for confirmation that website demand is following through.`,
       evidence: 'Forward watch items derived from detected lag windows.',
     });
 

@@ -13,7 +13,7 @@ export interface WeeklyParseResult {
   mappedMetrics: number;
 }
 
-export type CsvSheetFormat = 'auto' | 'tidy' | 'social-scorecard' | 'podscribe';
+export type CsvSheetFormat = 'auto' | 'tidy' | 'social-scorecard' | 'podscribe' | 'amazon-revenue';
 
 export interface ParseWeeklyCsvOptions {
   format?: CsvSheetFormat;

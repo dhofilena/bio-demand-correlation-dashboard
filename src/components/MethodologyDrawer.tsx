@@ -19,7 +19,7 @@ const SECTIONS = [
   },
   {
     h: 'Data quality affects conclusions',
-    p: 'Content comes from CSV (Podscribe, Mighty Scout, Grin); demand comes from Triple Whale and a swappable Amazon search source. Missing weeks, mapping errors or partial API responses reduce reliability — the source health row shows which feeds are live vs mock.',
+    p: 'Content comes from CSV (Podscribe, Mighty Scout, Grin); demand comes from Triple Whale and the Amazon revenue scorecard. Missing weeks, mapping errors or partial API responses reduce reliability — the source health row shows which feeds are live vs mock.',
   },
 ];
 

@@ -2,13 +2,13 @@
 
 An executive-facing web app report that shows how **upstream content activity**
 (influencer posts, podcast strength, earned media) appears to **lead downstream
-demand signals** (Amazon search, Google organic, direct traffic, revenue) over
+demand signals** (Google organic, direct traffic, Amazon revenue, DTC revenue) over
 time — framed explicitly as **correlation-oriented planning, not attribution**.
 
 Three connected views answer: *What changed? Why do we think it changed? How
 confident are we? What should we do next?*
 
-- **Timeline** — multi-series chart (indexed or absolute), lag alignment (0/1/2/auto),
+- **Timeline** — multi-series chart (indexed or absolute), lag alignment (0–4/auto),
   spike annotations, a lag explorer, and a plain-English insight banner.
 - **Scorecard** — channel-by-channel decision table: this week vs the 4-week
   baseline, status, the likely leading signal, confidence, and an interpretation.
@@ -60,31 +60,28 @@ npm run proxy          # node --env-file=.env server/index.mjs  (serves /api on 
 
 Serve `dist/` from your static host / CDN and route `/api/*` to the proxy.
 
-## Configure Triple Whale (and the swappable Amazon source)
+## Configure Triple Whale
 
 1. `cp .env.example .env` and fill in:
    ```env
    TW_API_KEY=...           # your key (kept server-side)
    TW_SHOP_ID=your-store.myshopify.com
    DEMAND_DATA_MODE=live    # 'mock' (default) keeps everything offline
-   AMAZON_ADAPTER=mock      # 'custom' to plug a real Amazon search source
    ```
 2. Open **`server/config.mjs`** — this is the one file you edit to wire real
    endpoints. Each adapter has an `endpoints` block and a `fieldMap`:
    - `tripleWhaleConfig.endpoints.metrics` → **paste your real metrics path here**.
    - `tripleWhaleConfig.fieldMap` → rename the right-hand values to the metric ids
      / response keys the live API actually returns.
-   - `amazonSearchConfig` → same idea for the Amazon search source.
 3. Adjust the request body / auth header and the `transform*` functions in
-   `server/adapters/tripleWhaleAdapter.mjs` and `amazonSearchAdapter.mjs`. Every
-   spot you need to touch is marked with a `👉` comment and has a `mockDemand`
-   fallback, so a wrong field name degrades gracefully (the header shows
-   `error`/`mock` per source) instead of crashing the report.
+   `server/adapters/tripleWhaleAdapter.mjs`. Every spot you need to touch is marked
+   with a `👉` comment and has a `mockDemand` fallback, so a wrong field name
+   degrades gracefully (the header shows `error`/`mock` per source) instead of
+   crashing the report.
 
-> **Adapter-based by design:** the app does **not** assume Triple Whale owns every
-> metric. Triple Whale supplies website organic/direct/revenue; Amazon search is a
-> separate, swappable adapter (point it at Helium 10, Jungle Scout, an internal
-> feed, etc.). The UI treats both as one report.
+> **Adapter-based by design:** Triple Whale supplies website organic/direct/DTC
+> revenue. Amazon organic and PPC revenue come from the Amazon revenue scorecard
+> CSV tab. The UI merges both into one report.
 
 ## CSV ingestion
 
@@ -106,7 +103,7 @@ sample file’s headers.
 server/                     # secure proxy (no secrets in the client)
   config.mjs                # 👉 endpoints + field maps you edit
   handler.mjs               # orchestrates adapters, merges by week, reports health
-  adapters/                 # tripleWhale / amazonSearch / mockDemand
+  adapters/                 # tripleWhale / mockDemand
   index.mjs                 # standalone Express entry
 src/
   config/metrics.ts         # metric registry (labels, colors, groups, units)
@@ -121,7 +118,7 @@ src/
 ## Insight engine (deterministic, explainable)
 
 No AI calls. Every statement traces to the numbers: week-over-week deltas, a
-trailing 4-week baseline, and lagged Pearson correlation across 0–2 week windows.
+trailing 4-week baseline, and lagged Pearson correlation across 0–4 week windows.
 It distinguishes demand strength, content-led lift, paid delivery issues, and
 insufficient evidence, and assigns Low/Medium/High confidence from correlation
 strength. See the in-app **Methodology** drawer.

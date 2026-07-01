@@ -2,7 +2,6 @@ import { env } from './config.mjs';
 import { normalizeDemandPeriod } from './dates.mjs';
 import { fetchMockDemand } from './adapters/mockDemand.mjs';
 import { fetchTripleWhaleWeekly } from './adapters/tripleWhaleAdapter.mjs';
-import { fetchAmazonSearchWeekly } from './adapters/amazonSearchAdapter.mjs';
 
 // ===========================================================================
 // Demand request handler. Orchestrates the per-source adapters, merges them by
@@ -55,7 +54,6 @@ export async function getWeeklyDemand(q) {
             status: 'mock',
             detail: env.TW_API_KEY ? 'Live mode off (DEMAND_DATA_MODE)' : 'No API key configured',
           },
-          { id: 'amazon-search', label: 'Amazon search', status: 'mock', detail: 'Mock adapter' },
         ],
       },
     };
@@ -72,24 +70,13 @@ export async function getWeeklyDemand(q) {
       weekLabel: r.weekLabel,
       googleOrganicSessions: r.googleOrganicSessions,
       nonOrganicPageViews: r.nonOrganicPageViews,
-      amazonRevenue: r.amazonRevenue,
+      gaOrganicRevenue: r.gaOrganicRevenue,
+      gaPaidRevenue: r.gaPaidRevenue,
+      gaSocialRevenue: r.gaSocialRevenue,
+      gaOtherRevenue: r.gaOtherRevenue,
       dtcRevenue: r.dtcRevenue,
     }));
     health.push({ id: 'triple-whale', label: 'Triple Whale', status: 'error', detail: String(err.message || err) });
-  }
-
-  let amazon = [];
-  if (env.AMAZON_ADAPTER === 'custom') {
-    try {
-      amazon = await fetchAmazonSearchWeekly(period.start, period.end);
-      health.push({ id: 'amazon-search', label: 'Amazon search', status: 'live', detail: `${amazon.length} weeks` });
-    } catch (err) {
-      amazon = fetchMockDemand(period.start, period.end).map((r) => ({ weekStart: r.weekStart, amazonSearchVolume: r.amazonSearchVolume }));
-      health.push({ id: 'amazon-search', label: 'Amazon search', status: 'error', detail: String(err.message || err) });
-    }
-  } else {
-    amazon = fetchMockDemand(period.start, period.end).map((r) => ({ weekStart: r.weekStart, amazonSearchVolume: r.amazonSearchVolume }));
-    health.push({ id: 'amazon-search', label: 'Amazon search', status: 'mock', detail: `Adapter: ${env.AMAZON_ADAPTER}` });
   }
 
   const degraded = health.some((h) => h.status === 'error');
@@ -98,7 +85,7 @@ export async function getWeeklyDemand(q) {
     body: {
       source: 'triple-whale',
       generatedAt: new Date().toISOString(),
-      weeks: mergeByWeek(tw, amazon),
+      weeks: mergeByWeek(tw),
       health,
       warning: degraded ? 'One or more live sources failed; mock values were substituted.' : undefined,
     },

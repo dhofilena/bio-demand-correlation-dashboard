@@ -17,17 +17,12 @@ export const env = {
   // 'live' attempts the real APIs; anything else (or a missing key) uses mock.
   DEMAND_DATA_MODE: process.env.DEMAND_DATA_MODE ?? 'mock',
 
-  // Which adapter supplies Amazon search: 'mock' | 'triplewhale' | 'custom'.
-  AMAZON_ADAPTER: process.env.AMAZON_ADAPTER ?? 'mock',
-  AMAZON_API_BASE: process.env.AMAZON_API_BASE ?? '',
-  AMAZON_API_KEY: process.env.AMAZON_API_KEY ?? '',
-
   // Google Sheets — private CSV source via service account (server-only).
   GOOGLE_SHEETS_ENABLED: process.env.GOOGLE_SHEETS_ENABLED === 'true',
   GOOGLE_SHEET_ID: process.env.GOOGLE_SHEET_ID ?? '',
   /** @deprecated Use GOOGLE_SHEET_TABS when you have more than one tab. */
   GOOGLE_SHEET_GID: process.env.GOOGLE_SHEET_GID ?? '0',
-  /** JSON array: [{"gid":"0","label":"Social","format":"social-scorecard"},{"gid":"123","label":"Podscribe","format":"podscribe"}] */
+  /** JSON array: [{"gid":"0","label":"Social","format":"social-scorecard"},{"gid":"123","label":"Podscribe","format":"podscribe","spreadsheetId":"..."}] */
   GOOGLE_SHEET_TABS: process.env.GOOGLE_SHEET_TABS ?? '',
   GOOGLE_SERVICE_ACCOUNT_JSON: process.env.GOOGLE_SERVICE_ACCOUNT_JSON ?? '',
   GOOGLE_SERVICE_ACCOUNT_KEY_FILE: process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE ?? '',
@@ -38,7 +33,8 @@ export const env = {
 /**
  * Tabs to pull from the workbook identified by GOOGLE_SHEET_ID.
  * Each tab is targeted by its gid (from the URL #gid=…).
- * @returns {{ gid: string, label: string }[]}
+ * Optional per-tab `spreadsheetId` overrides GOOGLE_SHEET_ID for that tab.
+ * @returns {{ gid: string, label: string, format?: string, spreadsheetId?: string }[]}
  */
 export function getGoogleSheetTabs() {
   if (env.GOOGLE_SHEET_TABS) {
@@ -50,6 +46,7 @@ export function getGoogleSheetTabs() {
       gid: String(tab.gid ?? tab.sheetGid ?? '0'),
       label: String(tab.label ?? tab.name ?? `Sheet ${i + 1}`),
       format: tab.format ? String(tab.format) : undefined,
+      spreadsheetId: tab.spreadsheetId ? String(tab.spreadsheetId) : undefined,
     }));
   }
   return [{ gid: env.GOOGLE_SHEET_GID, label: 'Google Sheet' }];
@@ -118,15 +115,54 @@ WHERE event_date BETWEEN @startDate AND @endDate
 GROUP BY week_start_monday
 ORDER BY week_start_monday`,
     },
-  },
-};
-
-export const amazonSearchConfig = {
-  base: env.AMAZON_API_BASE,
-  endpoints: {
-    search: '/search-volume', // <-- replace with your real Amazon search source path
-  },
-  fieldMap: {
-    amazonSearchVolume: 'search_volume',
+    ga4RevenueByChannel: {
+      weekColumn: 'week_start',
+      fields: {
+        gaOrganicRevenue: 'organic_revenue',
+        gaPaidRevenue: 'paid_revenue',
+        gaSocialRevenue: 'social_revenue',
+        gaOtherRevenue: 'other_ga4_revenue',
+      },
+      sql: `WITH
+  mapped AS (
+    SELECT
+      toMonday(event_date) AS week_start,
+      toMonday(event_date) + INTERVAL 6 DAY AS week_end,
+      CASE
+        WHEN session_default_channel_group ILIKE '%social%' THEN 'Social Revenue'
+        WHEN session_default_channel_group IN (
+          'Organic Search',
+          'Organic Shopping',
+          'Organic Video'
+        ) THEN 'Organic Revenue'
+        WHEN session_default_channel_group IN (
+          'Paid Search',
+          'Paid Shopping',
+          'Paid Video',
+          'Paid Other',
+          'Cross-network',
+          'Display'
+        ) THEN 'Paid Revenue'
+        ELSE 'Other GA4 Revenue'
+      END AS revenue_bucket,
+      total_revenue
+    FROM ga4_sessions_agg_table
+    WHERE event_date BETWEEN @startDate AND @endDate
+  )
+SELECT
+  week_start,
+  week_end,
+  SUMIf(total_revenue, revenue_bucket = 'Organic Revenue') AS organic_revenue,
+  SUMIf(total_revenue, revenue_bucket = 'Paid Revenue') AS paid_revenue,
+  SUMIf(total_revenue, revenue_bucket = 'Social Revenue') AS social_revenue,
+  SUMIf(total_revenue, revenue_bucket = 'Other GA4 Revenue') AS other_ga4_revenue,
+  SUM(total_revenue) AS total_ga4_revenue
+FROM mapped
+GROUP BY
+  week_start,
+  week_end
+ORDER BY
+  week_start`,
+    },
   },
 };

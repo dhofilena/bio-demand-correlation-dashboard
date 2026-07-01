@@ -173,6 +173,7 @@ export async function syncSheetsToCache() {
       gid: tab.gid,
       label: tab.label,
       format: tab.format,
+      spreadsheetId: tab.spreadsheetId,
       rowCount: tab.rowCount,
       file: fileName,
     });

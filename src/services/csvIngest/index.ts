@@ -24,5 +24,6 @@ export {
 
 export { tryParseSocialScorecard, tryParseScorecardCsv } from './socialScorecard';
 export { tryParsePodscribe } from './podscribe';
-export { parseWideWeeklyLayout } from './wideWeeklyLayout';
+export { tryParseAmazonRevenueScorecard } from './amazonRevenueScorecard';
+export { parseWideWeeklyLayout, parseWideWeeklyLayoutFromColumn } from './wideWeeklyLayout';
 export { mergeWeekly, parseWeeklyCsv } from './parseWeeklyCsv';

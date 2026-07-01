@@ -21,6 +21,9 @@ export const ArrowDown = ({ size = 14, className }: P) => (
 export const ArrowRight = ({ size = 14, className }: P) => (
   <svg {...base(size)} className={className}><path d="M5 12h14M12 5l7 7-7 7" /></svg>
 );
+export const ChevronDown = ({ size = 14, className }: P) => (
+  <svg {...base(size)} className={className}><path d="M6 9l6 6 6-6" /></svg>
+);
 export const Upload = ({ size = 15, className }: P) => (
   <svg {...base(size)} className={className}><path d="M12 16V4M7 9l5-5 5 5M5 20h14" /></svg>
 );

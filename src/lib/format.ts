@@ -17,6 +17,7 @@ const currencyCompactFmt = new Intl.NumberFormat('en-US', {
 export function formatValue(value: number | null | undefined, unit: Unit, compact = false): string {
   if (value === null || value === undefined || Number.isNaN(value)) return '—';
   if (unit === 'currency') return (compact ? currencyCompactFmt : currencyFmt).format(value);
+  if (unit === 'ratio') return `${value.toFixed(2)}x`;
   if (compact) return compactFmt.format(value);
   return numberFmt.format(Math.round(value));
 }

@@ -43,7 +43,6 @@ export function buildDemoDataset(
     health: [
       { ...CONTENT_HEALTH, status: csvRecords?.length ? 'live' : 'mock', detail: csvRecords?.length ? `${csvRecords.length} weeks uploaded` : 'Using bundled demo content' },
       { id: 'triple-whale', label: 'Triple Whale', status: 'mock', detail: 'Demo data' },
-      { id: 'amazon-search', label: 'Amazon search', status: 'mock', detail: 'Demo data' },
     ],
   };
 }

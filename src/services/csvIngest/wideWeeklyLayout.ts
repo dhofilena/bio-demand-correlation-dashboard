@@ -78,7 +78,33 @@ export function parseWideWeeklyLayout(rows: string[][]): WideWeeklyLayout | null
   const implicit = labeled ?? findImplicitStartDateRow(rows);
   if (!implicit) return null;
 
-  const { rowIdx: startDateRowIdx, colStart: dateColStart } = implicit;
+  return buildWideWeeklyLayout(rows, implicit.rowIdx, implicit.colStart);
+}
+
+/** Parse week columns when weekly values start at a fixed column (e.g. column WA). */
+export function parseWideWeeklyLayoutFromColumn(rows: string[][], dateColStart: number): WideWeeklyLayout | null {
+  if (!rows.length || dateColStart < 0) return null;
+
+  const labeled = findLabeledStartDateRow(rows);
+  let startDateRowIdx = labeled?.rowIdx ?? -1;
+  if (startDateRowIdx < 0) {
+    for (let r = 0; r < Math.min(rows.length, 15); r++) {
+      if (looksLikeWeekDate(rows[r]?.[dateColStart] ?? '')) {
+        startDateRowIdx = r;
+        break;
+      }
+    }
+  }
+  if (startDateRowIdx < 0) return null;
+
+  return buildWideWeeklyLayout(rows, startDateRowIdx, dateColStart);
+}
+
+function buildWideWeeklyLayout(
+  rows: string[][],
+  startDateRowIdx: number,
+  dateColStart: number,
+): WideWeeklyLayout | null {
   const sheetYear = inferSheetYear(rows);
   const startDateRow = rows[startDateRowIdx];
   const weekNumRow = findWeekNumberRow(rows, startDateRowIdx, dateColStart);

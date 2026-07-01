@@ -16,7 +16,7 @@ const DROP = -10; // % below 4-week baseline considered a drop
 
 /** Demand channels checked for content-led spikes in section 1. */
 const CONTENT_LED_DEMAND_KEYS: MetricKey[] = [
-  'amazonSearchVolume',
+  'amazonOrganicRevenue',
   'googleOrganicSessions',
   'dtcRevenue',
 ];
@@ -63,7 +63,7 @@ export function generateInsights(records: WeeklyRecord[]): Insight[] {
   const insights: Insight[] = [];
   const lastWeek = records[records.length - 1].weekLabel;
 
-  // 1) Content-led lift: a demand channel is up and a content signal led it 1–2 weeks prior.
+  // 1) Content-led lift: a demand channel is up and a content signal led it in a prior week.
   for (const demandKey of CONTENT_LED_DEMAND_KEYS) {
     const demand = lastWeekState(records, demandKey);
     if (!demand.spiked) continue;
@@ -86,12 +86,12 @@ export function generateInsights(records: WeeklyRecord[]): Insight[] {
         confidence: 'Low',
         title: `${label(demandKey)} rose this week`,
         text: `${label(demandKey)} is ${formatPct(demand.vsRollingPct)} vs baseline, but no clear preceding content spike was detected, so confidence in a content-led explanation is low.`,
-        evidence: 'No leading content signal above threshold in the prior 1–2 weeks.',
+        evidence: 'No leading content signal above threshold in the prior 0–4 week window.',
       });
     }
   }
 
-  // 2) Non-organic page views + branded awareness.
+  // 2) Google Paid Sessions + branded awareness.
   const nonOrganicPv = lastWeekState(records, 'nonOrganicPageViews');
   const emv = lastWeekState(records, 'emv');
   if (nonOrganicPv.spiked && (emv.vsRollingPct ?? 0) > 0) {
@@ -99,21 +99,21 @@ export function generateInsights(records: WeeklyRecord[]): Insight[] {
       id: 'non-organic-awareness',
       kind: 'demand-strength',
       confidence: 'Medium',
-      title: 'Non-organic page views rising with awareness',
-      text: `Non-organic page views are ${formatPct(nonOrganicPv.vsRollingPct)} vs baseline as earned media value also rose. Rising paid and direct-style traffic alongside awareness activity is consistent with growing branded interest.`,
-      evidence: 'Non-organic page views above baseline coincides with elevated EMV.',
+      title: 'Google Paid Sessions rising with awareness',
+      text: `Google Paid Sessions are ${formatPct(nonOrganicPv.vsRollingPct)} vs baseline as earned media value also rose. Rising paid traffic alongside awareness activity is consistent with growing branded interest.`,
+      evidence: 'Google Paid Sessions above baseline coincides with elevated EMV.',
     });
   }
 
-  // 4) Explicit lag callouts (Amazon search vs influencer, organic vs podcast, sessions vs DTC revenue).
-  const infl = lagCorrelation(records, 'influencerPosts', 'amazonSearchVolume');
+  // 4) Explicit lag callouts (Amazon organic revenue vs influencer, organic vs podcast, sessions vs DTC revenue).
+  const infl = lagCorrelation(records, 'profilePosted', 'amazonOrganicRevenue');
   if (infl.bestLag >= 1 && infl.r > 0.35) {
     insights.push({
       id: 'lag-influencer-amazon',
       kind: 'content-led-lift',
       confidence: infl.confidence,
-      title: 'Influencer activity appears to lead Amazon search',
-      text: `Across the window, influencer posting tends to precede Amazon search movement by about ${infl.bestLag} week${
+      title: 'Influencer activity appears to lead Amazon organic revenue',
+      text: `Across the window, influencer posting tends to precede Amazon organic revenue movement by about ${infl.bestLag} week${
         infl.bestLag > 1 ? 's' : ''
       }. Plan creator pushes ahead of key Amazon moments rather than at launch.`,
       evidence: `Best fit at lag ${infl.bestLag}w, r=${infl.r.toFixed(2)}.`,

@@ -22,9 +22,14 @@ export async function fetchTripleWhaleWeekly(start, end) {
 
   for (const [field, queryCfg] of entries) {
     const rows = await executeSqlQuery(start, end, queryCfg.sql);
-    for (const row of transformSqlRows(rows, queryCfg, field)) {
+    const weekRows = queryCfg.fields
+      ? transformMultiFieldSqlRows(rows, queryCfg)
+      : transformSqlRows(rows, queryCfg, field);
+
+    for (const row of weekRows) {
       const existing = byWeek.get(row.weekStart) ?? { weekStart: row.weekStart, weekLabel: row.weekLabel };
-      byWeek.set(row.weekStart, { ...existing, [field]: row[field] });
+      const { weekStart, weekLabel: label, ...values } = row;
+      byWeek.set(row.weekStart, { ...existing, ...values });
     }
   }
 
@@ -93,5 +98,22 @@ export function transformSqlRows(rows, queryCfg, field) {
       weekLabel: weekLabel(iso),
       [field]: Number.isFinite(v) ? v : null,
     };
+  });
+}
+
+/**
+ * @param {Array<Record<string, unknown>>} rows
+ * @param {{ weekColumn: string, fields: Record<string, string> }} queryCfg
+ */
+export function transformMultiFieldSqlRows(rows, queryCfg) {
+  const { weekColumn, fields } = queryCfg;
+  return rows.map((row) => {
+    const iso = mondayOf(String(row[weekColumn] ?? ''));
+    const out = { weekStart: iso, weekLabel: weekLabel(iso) };
+    for (const [field, column] of Object.entries(fields)) {
+      const v = Number(row[column]);
+      out[field] = Number.isFinite(v) ? v : null;
+    }
+    return out;
   });
 }

@@ -13,15 +13,27 @@ export interface WeeklyRecord {
   influencerPosts: number | null;
   instagramPosts: number | null;
   tiktokPosts: number | null;
-  podcastImpressions: number | null; // Podscribe total impressions (BIOptimizers - TOTALS row)
+  profilePosted: number | null; // Mighty Scout Total — Profile Posted (row 10)
+  socialImpressions: number | null; // Mighty Scout Total — Impressions (row 12)
+  socialReach: number | null; // Mighty Scout Total — Reach (row 14)
+  socialEngagement: number | null; // Mighty Scout Total — Engagement (row 16)
+  mediaPosted: number | null; // Mighty Scout Total — Media Posted (row 20)
+  podcastImpressions: number | null; // Podscribe — Total Impressions (row 6)
+  podcastIpModellingRevenue: number | null; // Podscribe — IP Modelling Revenue (row 8)
+  podcastLastClickSales: number | null; // Podscribe — Last-Click Sales (row 15)
+  podcastIpSalesMultiplier: number | null; // Podscribe — IP Sales vs Last Click Multiplier (row 48)
   podcastAdSpend: number | null;
-  emv: number | null; // earned media value
+  emv: number | null; // Mighty Scout Total — Earned Media Value (row 22)
 
   // --- Demand outcomes (downstream / lagging signals) ---
-  amazonSearchVolume: number | null;
   googleOrganicSessions: number | null;
   nonOrganicPageViews: number | null;
-  amazonRevenue: number | null;
+  gaOrganicRevenue: number | null;
+  gaPaidRevenue: number | null;
+  gaSocialRevenue: number | null;
+  gaOtherRevenue: number | null;
+  amazonOrganicRevenue: number | null;
+  amazonPpcRevenue: number | null;
   dtcRevenue: number | null;
 
   notes?: string;
@@ -32,17 +44,29 @@ export type MetricKey =
   | 'influencerPosts'
   | 'instagramPosts'
   | 'tiktokPosts'
+  | 'profilePosted'
+  | 'socialImpressions'
+  | 'socialReach'
+  | 'socialEngagement'
+  | 'mediaPosted'
   | 'podcastImpressions'
+  | 'podcastIpModellingRevenue'
+  | 'podcastLastClickSales'
+  | 'podcastIpSalesMultiplier'
   | 'podcastAdSpend'
   | 'emv'
-  | 'amazonSearchVolume'
   | 'googleOrganicSessions'
   | 'nonOrganicPageViews'
-  | 'amazonRevenue'
+  | 'gaOrganicRevenue'
+  | 'gaPaidRevenue'
+  | 'gaSocialRevenue'
+  | 'gaOtherRevenue'
+  | 'amazonOrganicRevenue'
+  | 'amazonPpcRevenue'
   | 'dtcRevenue';
 
 export type SignalGroup = 'content' | 'demand';
-export type Unit = 'count' | 'currency' | 'index';
+export type Unit = 'count' | 'currency' | 'index' | 'ratio';
 export type StatusLabel = 'Strong' | 'Moderate' | 'Flat' | 'Soft';
 export type Confidence = 'Low' | 'Medium' | 'High';
 
@@ -88,7 +112,7 @@ export interface MetricSummary {
 export interface LagResult {
   contentKey: MetricKey;
   demandKey: MetricKey;
-  bestLag: number; // weeks the content signal appears to lead (0,1,2)
+  bestLag: number; // weeks the content signal appears to lead (0–4)
   r: number; // Pearson r at bestLag
   byLag: { lag: number; r: number }[];
   confidence: Confidence;

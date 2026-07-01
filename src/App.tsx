@@ -55,7 +55,7 @@ export default function App() {
     <div style={{ minHeight: '100%', display: 'flex', flexDirection: 'column' }}>
       <Header onOpenMethodology={() => setMethodOpen(true)} onOpenUpload={() => setUploadOpen(true)} />
 
-      <main style={{ maxWidth: 1400, margin: '0 auto', padding: '20px 24px 48px', width: '100%', display: 'flex', flexDirection: 'column', gap: 18 }}>
+      <main style={{ maxWidth: 1800, margin: '0 auto', padding: '20px 24px 48px', width: '100%', display: 'flex', flexDirection: 'column', gap: 18 }}>
         <KpiStrip />
 
         {status === 'error' ? (
@@ -85,7 +85,7 @@ export default function App() {
           <div style={{ flex: 1, minWidth: 240 }}>
             <div style={{ fontSize: 12.5, fontWeight: 600, marginBottom: 3 }}>Data quality & assumptions</div>
             <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
-              Correlation-oriented planning view, not an attribution model. Lag windows (0–2 weeks) are estimated from a short history; status uses a trailing 4-week baseline. Content comes from CSV, demand from Triple Whale + a swappable Amazon source. The header shows which feeds are live vs mock.
+              Correlation-oriented planning view, not an attribution model. Lag windows (0–4 weeks) are estimated from a short history; status uses a trailing 4-week baseline. Content comes from CSV, demand from Triple Whale and Amazon revenue scorecard. The header shows which feeds are live vs mock.
             </p>
           </div>
           <button className="btn" onClick={() => setMethodOpen(true)}>Full methodology</button>

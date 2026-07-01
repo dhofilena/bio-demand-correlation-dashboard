@@ -18,6 +18,10 @@ try {
   for (const tab of bundle.tabs) {
     console.log(`  · ${tab.label} (gid=${tab.gid}): ${tab.rowCount} rows`);
   }
+  if (bundle.partialErrors?.length) {
+    console.warn('[sheets:sync] Some tabs failed:');
+    for (const msg of bundle.partialErrors) console.warn(`  ! ${msg}`);
+  }
 } catch (err) {
   console.error('[sheets:sync] Failed:', err instanceof Error ? err.message : err);
   process.exit(1);

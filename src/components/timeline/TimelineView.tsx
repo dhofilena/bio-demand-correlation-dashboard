@@ -1,14 +1,14 @@
 import { useMemo } from 'react';
 import { useDashboard, type LagSetting } from '../../store/dashboardStore';
-import { METRICS, METRIC_LIST, CONTENT_KEYS, DEMAND_CHANNELS } from '../../config/metrics';
+import { METRICS, METRIC_LIST, CONTENT_KEYS, DEMAND_CHANNELS, SOCIAL_SIGNAL_KEYS, PODSCRIBE_SIGNAL_KEYS, signalToggleLabel } from '../../config/metrics';
 import type { MetricKey } from '../../types';
-import { lagCorrelation, bestLeadingSignal } from '../../lib/correlation';
+import { lagCorrelation, bestLeadingSignal, LAG_WEEKS } from '../../lib/correlation';
 import { generateInsights } from '../../lib/insightEngine';
 import { TimelineChart } from './TimelineChart';
 import { InsightBanner } from './InsightBanner';
 import { Dot } from '../common/ui';
 
-const CONTENT_TOGGLES: MetricKey[] = ['influencerPosts', 'instagramPosts', 'tiktokPosts', 'podcastImpressions', 'emv'];
+const CONTENT_TOGGLES: MetricKey[] = [...SOCIAL_SIGNAL_KEYS, ...PODSCRIBE_SIGNAL_KEYS];
 const DEMAND_TOGGLES: MetricKey[] = DEMAND_CHANNELS;
 
 function SeriesChips({ title, keys }: { title: string; keys: MetricKey[] }) {
@@ -24,7 +24,7 @@ function SeriesChips({ title, keys }: { title: string; keys: MetricKey[] }) {
           <button key={k} className={`chip ${on ? 'chip-on' : ''}`} onClick={() => toggle(k)} aria-pressed={on}
             style={on ? { borderColor: def.color } : undefined}>
             <Dot color={on ? def.color : 'var(--text-faint)'} />
-            {def.short}
+            {signalToggleLabel(k)}
           </button>
         );
       })}
@@ -79,10 +79,10 @@ export function TimelineView() {
 
   const insights = useMemo(() => generateInsights(records), [records]);
 
-  // Lag explorer mini-readout: influencer→amazon and podcast→organic across 0–2w.
+  // Lag explorer mini-readout: influencer→Amazon organic revenue and podcast→organic across 0–4w.
   const explorer = useMemo(() => {
     return [
-      lagCorrelation(records, 'influencerPosts', 'amazonSearchVolume'),
+      lagCorrelation(records, 'profilePosted', 'amazonOrganicRevenue'),
       lagCorrelation(records, 'podcastImpressions', 'googleOrganicSessions'),
     ];
   }, [records]);
@@ -111,7 +111,7 @@ export function TimelineView() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 6 }}>
           <span style={{ fontSize: 11.5, color: 'var(--text-muted)', fontWeight: 600 }}>Lag alignment</span>
           <Segmented<LagSetting> value={lag} onChange={setLag}
-            options={[{ label: '0w', value: 0 }, { label: '1w', value: 1 }, { label: '2w', value: 2 }, { label: 'Auto', value: 'auto' }]} />
+            options={[...LAG_WEEKS.map((w) => ({ label: `${w}w`, value: w })), { label: 'Auto', value: 'auto' as const }]} />
           <span style={{ fontSize: 11.5, color: 'var(--text-faint)' }}>
             {lag === 'auto' ? `Auto-detected: ${auto.label}` : `Demand pulled back ${effectiveLag} week${effectiveLag === 1 ? '' : 's'} to test a leading relationship`}
           </span>
@@ -124,7 +124,7 @@ export function TimelineView() {
 
       <div className="card" style={{ padding: 16 }}>
         <h3 style={{ margin: '0 0 4px', fontSize: 13.5, fontWeight: 650 }}>Lag explorer</h3>
-        <p style={{ margin: '0 0 12px', fontSize: 12, color: 'var(--text-muted)' }}>Correlation strength of each content signal against its demand outcome at 0–2 week lags. Higher and later = stronger lead.</p>
+        <p style={{ margin: '0 0 12px', fontSize: 12, color: 'var(--text-muted)' }}>Correlation strength of each content signal against its demand outcome at 0–4 week lags. Higher and later = stronger lead.</p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
           {explorer.map((res) => (
             <div key={`${res.contentKey}-${res.demandKey}`}>

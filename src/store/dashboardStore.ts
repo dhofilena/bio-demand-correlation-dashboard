@@ -2,10 +2,11 @@ import { create } from 'zustand';
 import type { CsvConnection, MetricKey, SourceHealth, WeeklyRecord } from '../types';
 import { buildDemoDataset, buildLiveDataset } from '../services/dataService';
 import { fetchSheetsStatus, loadWeeklyRecordsFromGoogleSheet, syncGoogleSheets } from '../services/sheetsService';
+import type { LagWeek } from '../lib/correlation';
 
 export type TabId = 'timeline' | 'scorecard' | 'summary';
 export type ValueMode = 'absolute' | 'indexed';
-export type LagSetting = 0 | 1 | 2 | 'auto';
+export type LagSetting = LagWeek | 'auto';
 export type Theme = 'light' | 'dark';
 
 const DEFAULT_CSV_CONNECTION: CsvConnection = {
@@ -56,17 +57,29 @@ interface DashboardState {
 const DEFAULT_RANGE = { start: '2026-03-16', end: '2026-06-21' };
 
 const DEFAULT_VISIBLE: Record<MetricKey, boolean> = {
-  influencerPosts: true,
+  influencerPosts: false,
+  profilePosted: true,
+  socialImpressions: true,
+  socialReach: true,
+  socialEngagement: true,
+  mediaPosted: true,
+  emv: true,
   podcastImpressions: true,
-  amazonSearchVolume: true,
+  podcastIpModellingRevenue: true,
+  podcastLastClickSales: true,
+  podcastIpSalesMultiplier: true,
   googleOrganicSessions: true,
   nonOrganicPageViews: false,
-  amazonRevenue: false,
+  gaOrganicRevenue: false,
+  gaPaidRevenue: false,
+  gaSocialRevenue: false,
+  gaOtherRevenue: false,
+  amazonOrganicRevenue: false,
+  amazonPpcRevenue: false,
   dtcRevenue: false,
   instagramPosts: false,
   tiktokPosts: false,
   podcastAdSpend: false,
-  emv: false,
 };
 
 export const useDashboard = create<DashboardState>((set, get) => ({

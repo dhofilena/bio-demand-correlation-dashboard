@@ -161,7 +161,7 @@ export function Header({ onOpenMethodology, onOpenUpload }: { onOpenMethodology:
 
   return (
     <header style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface)', position: 'sticky', top: 0, zIndex: 20 }}>
-      <div style={{ maxWidth: 1400, margin: '0 auto', padding: '14px 24px' }}>
+      <div style={{ maxWidth: 1800, margin: '0 auto', padding: '14px 24px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--accent)', display: 'grid', placeItems: 'center', color: '#fff' }}>

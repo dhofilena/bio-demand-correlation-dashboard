@@ -6,18 +6,39 @@ export const METRIC_KEYS = METRIC_LIST.map((m) => m.key);
 
 export const FIELD_HINTS: Record<'weekStart' | MetricKey, string[]> = {
   weekStart: ['weekstart', 'week start', 'date', 'week', 'start date'],
-  influencerPosts: ['influencer', 'posts', 'profile posted', 'profle posted', 'media posted'],
+  influencerPosts: ['influencer', 'posts', 'profile posted', 'profle posted'],
   instagramPosts: ['instagram', 'ig post', '@bioptimizers ig', 'bioptimizers ig'],
   tiktokPosts: ['tiktok', 'tt post', '@bioptimizers tiktok', 'bioptimizers tiktok'],
+  profilePosted: ['profile posted', 'profle posted'],
+  socialImpressions: ['impressions'],
+  socialReach: ['reach'],
+  socialEngagement: ['engagement (likes', 'engagement'],
+  mediaPosted: ['media posted'],
   podcastImpressions: ['podcast impression', 'total impression', 'podcast', 'streaming'],
+  podcastIpModellingRevenue: ['ip modelling revenue', 'pod ip revenue'],
+  podcastLastClickSales: ['last click sales', 'last-click sales', 'podscribe sales'],
+  podcastIpSalesMultiplier: ['ip sales multiplier', 'weekly multiplier vs last click', 'ip vs last click'],
   podcastAdSpend: ['podcast spend', 'pod spend', 'ad spend'],
   emv: ['emv', 'earned media'],
-  amazonSearchVolume: ['amazon search', 'search volume'],
   googleOrganicSessions: ['organic', 'sessions'],
   nonOrganicPageViews: ['non_organic_page_views', 'non organic page views', 'non-organic page views', 'direct'],
-  amazonRevenue: ['amazon revenue', 'amazon sales'],
+  gaOrganicRevenue: ['ga organic revenue', 'organic revenue'],
+  gaPaidRevenue: ['ga paid revenue', 'paid revenue'],
+  gaSocialRevenue: ['ga social revenue', 'social revenue'],
+  gaOtherRevenue: ['ga other revenue', 'other ga4 revenue', 'other revenue'],
+  amazonOrganicRevenue: ['amazon organic revenue'],
+  amazonPpcRevenue: ['amazon ppc revenue'],
   dtcRevenue: ['dtc revenue', 'website sales', 'dtc sales'],
 };
+
+/** Convert Excel-style column letters (e.g. WA) to a 0-based index. */
+export function colLetterToIndex(col: string): number {
+  let n = 0;
+  for (const ch of col.trim().toUpperCase()) {
+    n = n * 26 + (ch.charCodeAt(0) - 64);
+  }
+  return n - 1;
+}
 
 export function parseRawCsvRows(text: string): string[][] {
   const res = Papa.parse<string[]>(text, { header: false, skipEmptyLines: false });
@@ -66,7 +87,7 @@ export function parseWideDate(raw: string, defaultYear: number, prevIso: string 
 /** Parse a loose number string ("$1,234", "12.3%", "—") to a number or null. */
 export function toNumber(raw: string | undefined): number | null {
   if (raw === undefined || raw === null) return null;
-  const cleaned = raw.replace(/[$,%\s]/g, '').replace(/[—–-]+$/, '');
+  const cleaned = raw.replace(/[$,%\sx]/gi, '').replace(/[—–-]+$/, '');
   if (cleaned === '' || cleaned === '-') return null;
   const n = Number(cleaned);
   return Number.isFinite(n) ? n : null;
@@ -113,13 +134,25 @@ export function emptyWeeklyRecord(week: { iso: string; weekNumber: number }): We
     influencerPosts: null,
     instagramPosts: null,
     tiktokPosts: null,
+    profilePosted: null,
+    socialImpressions: null,
+    socialReach: null,
+    socialEngagement: null,
+    mediaPosted: null,
     podcastImpressions: null,
+    podcastIpModellingRevenue: null,
+    podcastLastClickSales: null,
+    podcastIpSalesMultiplier: null,
     podcastAdSpend: null,
     emv: null,
-    amazonSearchVolume: null,
     googleOrganicSessions: null,
     nonOrganicPageViews: null,
-    amazonRevenue: null,
+    gaOrganicRevenue: null,
+    gaPaidRevenue: null,
+    gaSocialRevenue: null,
+    gaOtherRevenue: null,
+    amazonOrganicRevenue: null,
+    amazonPpcRevenue: null,
     dtcRevenue: null,
   };
 }

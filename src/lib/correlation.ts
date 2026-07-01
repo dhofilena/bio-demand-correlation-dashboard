@@ -1,5 +1,8 @@
 import type { Confidence, LagResult, MetricKey, WeeklyRecord } from '../types';
 
+export const LAG_WEEKS = [0, 1, 2, 3, 4] as const;
+export type LagWeek = (typeof LAG_WEEKS)[number];
+
 /** Pearson correlation over paired, finite samples. Returns 0 if undefined. */
 export function pearson(a: number[], b: number[]): number {
   const n = Math.min(a.length, b.length);
@@ -40,7 +43,7 @@ export function lagCorrelation(
   records: WeeklyRecord[],
   contentKey: MetricKey,
   demandKey: MetricKey,
-  lags: number[] = [0, 1, 2],
+  lags: number[] = [...LAG_WEEKS],
 ): LagResult {
   const content = series(records, contentKey);
   const demand = series(records, demandKey);

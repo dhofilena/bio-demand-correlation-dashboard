@@ -166,9 +166,10 @@ export async function fetchGoogleSheetCsv(gid) {
     throw new Error(`Unknown tab gid=${targetGid}. Configured gids: ${tabs.map((t) => t.gid).join(', ')}`);
   }
 
+  const spreadsheetId = tab.spreadsheetId ?? env.GOOGLE_SHEET_ID;
   const serviceAccount = loadServiceAccount();
   const accessToken = await getAccessToken(serviceAccount);
-  const { csv, rowCount } = await fetchTabCsv(env.GOOGLE_SHEET_ID, tab.gid, accessToken);
+  const { csv, rowCount } = await fetchTabCsv(spreadsheetId, tab.gid, accessToken);
 
   return {
     csv,
@@ -191,15 +192,35 @@ export async function fetchAllGoogleSheetTabs() {
   const configuredTabs = getGoogleSheetTabs();
   const serviceAccount = loadServiceAccount();
   const accessToken = await getAccessToken(serviceAccount);
-  const spreadsheetId = env.GOOGLE_SHEET_ID;
   const fetchedAt = new Date().toISOString();
 
-  const tabs = await Promise.all(
-    configuredTabs.map(async (tab) => {
+  const tabs = [];
+  const errors = [];
+  for (const tab of configuredTabs) {
+    try {
+      const spreadsheetId = tab.spreadsheetId ?? env.GOOGLE_SHEET_ID;
       const { csv, rowCount } = await fetchTabCsv(spreadsheetId, tab.gid, accessToken);
-      return { gid: tab.gid, label: tab.label, format: tab.format, csv, rowCount };
-    }),
-  );
+      tabs.push({
+        gid: tab.gid,
+        label: tab.label,
+        format: tab.format,
+        spreadsheetId,
+        csv,
+        rowCount,
+      });
+    } catch (err) {
+      errors.push(`"${tab.label}" (gid=${tab.gid}): ${err?.message || err}`);
+    }
+  }
 
-  return { spreadsheetId, tabs, fetchedAt };
+  if (!tabs.length) {
+    throw new Error(errors.join('; ') || 'No Google Sheet tabs could be fetched.');
+  }
+
+  const spreadsheetId = tabs[0]?.spreadsheetId ?? env.GOOGLE_SHEET_ID;
+  const result = { spreadsheetId, tabs, fetchedAt };
+  if (errors.length) {
+    result.partialErrors = errors;
+  }
+  return result;
 }

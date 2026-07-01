@@ -3,6 +3,7 @@ import type { ParseWeeklyCsvOptions, WeeklyParseResult } from './types';
 import { parseRawCsvRows } from './shared';
 import { tryParsePodscribe } from './podscribe';
 import { tryParseSocialScorecard } from './socialScorecard';
+import { tryParseAmazonRevenueScorecard } from './amazonRevenueScorecard';
 import { parseTidyCsv } from './tidy';
 
 function inferWideFormat(rows: string[][]): 'social-scorecard' | 'podscribe' {
@@ -51,6 +52,12 @@ export async function parseWeeklyCsv(
     throw new Error('Could not parse Podscribe layout.');
   }
 
+  if (format === 'amazon-revenue') {
+    const parsed = tryParseAmazonRevenueScorecard(text);
+    if (parsed?.records.length) return parsed;
+    throw new Error('Could not parse Amazon revenue scorecard layout.');
+  }
+
   const rows = parseRawCsvRows(text);
   const inferred = inferWideFormat(rows);
   const fallback: 'social-scorecard' | 'podscribe' =
@@ -62,7 +69,7 @@ export async function parseWeeklyCsv(
 
   throw new Error(
     'Could not parse weekly data. Use a tidy CSV (one row per week), a Social scorecard (Start Date row), ' +
-      'or a Podscribe wide export.',
+      'a Podscribe wide export, or an Amazon revenue scorecard.',
   );
 }
 
