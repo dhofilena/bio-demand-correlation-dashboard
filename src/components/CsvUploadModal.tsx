@@ -124,7 +124,7 @@ export function CsvUploadModal({ open, onClose }: { open: boolean; onClose: () =
               {csvRecords?.length ? (
                 <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5, color: 'var(--text-muted)' }}>
                   <span>{csvRecords.length} weeks currently loaded{csvConnection.source === 'upload' ? ' from upload' : ''}.</span>
-                  <button className="btn" onClick={() => { clearCsv(); }}>Clear & use demo content</button>
+                  <button className="btn" onClick={() => { clearCsv(); }}>Clear upload</button>
                 </div>
               ) : null}
             </div>
@@ -135,7 +135,7 @@ export function CsvUploadModal({ open, onClose }: { open: boolean; onClose: () =
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, fontSize: 12.5, color: 'var(--text-muted)' }}>
                 <strong style={{ color: 'var(--text)' }}>{fileName}</strong> · {parsed.rows.length} rows · {parsed.headers.length} columns
               </div>
-              <p style={{ marginTop: 0, fontSize: 12.5, color: 'var(--text-muted)' }}>Map each dashboard field to a column in your file. Only <strong>Week start</strong> is required; leave others blank to keep demo values.</p>
+              <p style={{ marginTop: 0, fontSize: 12.5, color: 'var(--text-muted)' }}>Map each dashboard field to a column in your file. Only <strong>Week start</strong> is required; leave others blank to skip that metric.</p>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: 10, margin: '12px 0 18px' }}>
                 {TARGET_FIELDS.map((f) => (

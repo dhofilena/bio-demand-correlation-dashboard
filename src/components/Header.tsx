@@ -1,7 +1,7 @@
 import { useDashboard } from '../store/dashboardStore';
 import type { CsvConnectionStatus, DataSourceStatus } from '../types';
 import { METRIC_LIST } from '../config/metrics';
-import { Bolt, Download, Info, Moon, Plug, Refresh, Sun, Upload } from './common/icons';
+import { Bolt, Download, Info, Moon, Refresh, Sun, Upload } from './common/icons';
 import { Dot } from './common/ui';
 
 const STATUS_COLOR: Record<DataSourceStatus, string> = {
@@ -151,10 +151,8 @@ function exportCsv(records: ReturnType<typeof useDashboard.getState>['records'])
 }
 
 export function Header({ onOpenMethodology, onOpenUpload }: { onOpenMethodology: () => void; onOpenUpload: () => void }) {
-  const { mode, status, lastUpdated, dateRange, theme, records, warning, health, csvConnection } = useDashboard();
+  const { status, lastUpdated, dateRange, theme, records, warning, health, csvConnection } = useDashboard();
   const sourceErrors = health.filter((h) => h.status === 'error' && h.detail);
-  const connectLive = useDashboard((s) => s.connectLive);
-  const useDemo = useDashboard((s) => s.useDemo);
   const refresh = useDashboard((s) => s.refresh);
   const toggleTheme = useDashboard((s) => s.toggleTheme);
   const setDateRange = useDashboard((s) => s.setDateRange);
@@ -182,15 +180,9 @@ export function Header({ onOpenMethodology, onOpenUpload }: { onOpenMethodology:
                 className="nums" style={inputStyle} aria-label="End date" title="Weeks are Monday–Sunday; demand APIs include through the Sunday of this week" />
             </div>
 
-            {mode === 'demo' ? (
-              <button className="btn btn-primary" onClick={() => connectLive()} disabled={status === 'loading'}>
-                <Plug size={14} /> {status === 'loading' ? 'Connecting…' : 'Connect live data'}
-              </button>
-            ) : (
-              <button className="btn" onClick={() => useDemo()}><Bolt size={14} /> Demo data</button>
-            )}
-
-            <button className="btn" onClick={() => refresh()} title="Refresh" aria-label="Refresh"><Refresh size={14} /></button>
+            <button className="btn" onClick={() => refresh()} disabled={status === 'loading'} title="Refresh" aria-label="Refresh">
+              <Refresh size={14} /> {status === 'loading' ? 'Loading…' : 'Refresh'}
+            </button>
             <button className="btn" onClick={onOpenUpload}><Upload size={14} /> Upload CSV</button>
             <button className="btn" onClick={() => exportCsv(records)}><Download size={14} /> Export</button>
             <button className="btn" onClick={onOpenMethodology} aria-label="Methodology"><Info size={14} /></button>
@@ -202,7 +194,7 @@ export function Header({ onOpenMethodology, onOpenUpload }: { onOpenMethodology:
           <HealthIndicator />
           <CsvConnectionIndicator />
           <span style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--text-faint)' }}>
-            Updated {relativeTime(lastUpdated)} · <span style={{ textTransform: 'capitalize' }}>{mode}</span> mode
+            Updated {relativeTime(lastUpdated)}
           </span>
         </div>
 
@@ -214,7 +206,7 @@ export function Header({ onOpenMethodology, onOpenUpload }: { onOpenMethodology:
 
         {sourceErrors.map((h) => (
           <div key={h.id} style={alertBannerStyle}>
-            <strong>{h.label}</strong>: {h.detail}. Demo values are being used for this source.
+            <strong>{h.label}</strong>: {h.detail}. Fallback values are being used for this source.
           </div>
         ))}
 

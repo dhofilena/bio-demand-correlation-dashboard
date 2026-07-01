@@ -15,17 +15,17 @@ confident are we? What should we do next?*
 - **Summary** — 5 deterministic executive cards (what improved / drove the lift /
   needs attention / action / watch).
 
-## Quick start (runs immediately on mock data)
+## Quick start
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open the printed URL. The app boots in **Demo mode** with a built-in 14-week
-dataset — no API key or CSV required. The Triple Whale proxy is mounted as Vite
-dev middleware, so this single command also serves `/api/*` with the key kept
-server-side.
+Open the printed URL. The app loads demand from the secure proxy and merges it
+with content from Google Sheets (when configured) or an uploaded CSV. The Triple
+Whale proxy is mounted as Vite dev middleware, so this single command also serves
+`/api/*` with the key kept server-side.
 
 ## How data flows
 
@@ -36,9 +36,8 @@ CSV upload (content) ─┐
  (demand, server-side)                              indexed, status)     deterministic)
 ```
 
-- **Demo mode** (default): everything local, no network.
-- **Live mode** (“Connect live data”): demand is fetched from the secure proxy and
-  merged with uploaded CSV content (or demo content as a fallback).
+Demand is fetched from the secure proxy and merged with uploaded CSV content or
+Google Sheets data. The header shows which feeds are live vs mock per source.
 
 ## Security model — the API key never reaches the browser
 
@@ -112,7 +111,6 @@ src/
   services/                 # dataService (orchestration) + csvIngest (parse/map/merge)
   store/dashboardStore.ts   # Zustand state
   components/               # Header, KpiStrip, timeline/ scorecard/ summary/, common/
-  data/mockWeeklyData.ts    # 14-week demo dataset
 ```
 
 ## Insight engine (deterministic, explainable)

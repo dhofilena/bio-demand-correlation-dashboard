@@ -24,9 +24,7 @@ export default function App() {
   const theme = useDashboard((s) => s.theme);
   const status = useDashboard((s) => s.status);
   const error = useDashboard((s) => s.error);
-  const mode = useDashboard((s) => s.mode);
   const connectLive = useDashboard((s) => s.connectLive);
-  const useDemo = useDashboard((s) => s.useDemo);
 
   const [methodOpen, setMethodOpen] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -89,9 +87,6 @@ export default function App() {
             </p>
           </div>
           <button className="btn" onClick={() => setMethodOpen(true)}>Full methodology</button>
-          <button className="btn" onClick={() => (mode === 'demo' ? connectLive() : useDemo())}>
-            {mode === 'demo' ? 'Connect live data' : 'Switch to demo'}
-          </button>
         </footer>
       </main>
 
