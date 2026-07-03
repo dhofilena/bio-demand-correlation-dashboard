@@ -35,6 +35,7 @@ export interface WeeklyRecord {
   amazonOrganicRevenue: number | null;
   amazonPpcRevenue: number | null;
   dtcRevenue: number | null;
+  brandedSearchVolume: number | null;
 
   notes?: string;
 }
@@ -63,7 +64,8 @@ export type MetricKey =
   | 'gaOtherRevenue'
   | 'amazonOrganicRevenue'
   | 'amazonPpcRevenue'
-  | 'dtcRevenue';
+  | 'dtcRevenue'
+  | 'brandedSearchVolume';
 
 export type SignalGroup = 'content' | 'demand';
 export type Unit = 'count' | 'currency' | 'index' | 'ratio';
@@ -164,11 +166,28 @@ export interface SourceHealth {
   detail: string;
 }
 
+/** One week of branded Google search volume for a product (or shop total). */
+export interface BrandedSearchWeekPoint {
+  weekStart: string;
+  weekLabel: string;
+  volume: number | null;
+  clicks: number | null;
+  avgPosition: number | null;
+}
+
+/** Product-level branded search series from Triple Whale search_terms × products. */
+export interface BrandedSearchData {
+  products: string[];
+  byProduct: Record<string, BrandedSearchWeekPoint[]>;
+  total: BrandedSearchWeekPoint[];
+}
+
 /** Payload returned by the server proxy (`/api/triplewhale/weekly`). */
 export interface DemandApiResponse {
   source: 'triple-whale' | 'mock';
   generatedAt: string;
   weeks: Partial<WeeklyRecord>[];
+  brandedSearch?: BrandedSearchData | null;
   health: SourceHealth[];
   warning?: string;
 }

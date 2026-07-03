@@ -20,8 +20,13 @@ export const FIELD_HINTS: Record<'weekStart' | MetricKey, string[]> = {
   podcastIpSalesMultiplier: ['ip sales multiplier', 'weekly multiplier vs last click', 'ip vs last click'],
   podcastAdSpend: ['podcast spend', 'pod spend', 'ad spend'],
   emv: ['emv', 'earned media'],
-  googleOrganicSessions: ['organic', 'sessions'],
-  nonOrganicPageViews: ['non_organic_page_views', 'non organic page views', 'non-organic page views', 'direct'],
+  googleOrganicSessions: ['google organic traffic', 'google_organic_traffic', 'organic traffic'],
+  nonOrganicPageViews: [
+    'google non-organic traffic',
+    'google_non_organic_traffic',
+    'non-organic traffic',
+    'non organic traffic',
+  ],
   gaOrganicRevenue: ['ga organic revenue', 'organic revenue'],
   gaPaidRevenue: ['ga paid revenue', 'paid revenue'],
   gaSocialRevenue: ['ga social revenue', 'social revenue'],
@@ -29,6 +34,7 @@ export const FIELD_HINTS: Record<'weekStart' | MetricKey, string[]> = {
   amazonOrganicRevenue: ['amazon organic revenue'],
   amazonPpcRevenue: ['amazon ppc revenue'],
   dtcRevenue: ['dtc revenue', 'website sales', 'dtc sales'],
+  brandedSearchVolume: ['branded search', 'branded search volume', 'google branded search'],
 };
 
 /** Convert Excel-style column letters (e.g. WA) to a 0-based index. */
@@ -154,6 +160,7 @@ export function emptyWeeklyRecord(week: { iso: string; weekNumber: number }): We
     amazonOrganicRevenue: null,
     amazonPpcRevenue: null,
     dtcRevenue: null,
+    brandedSearchVolume: null,
   };
 }
 

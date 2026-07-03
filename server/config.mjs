@@ -7,6 +7,8 @@
 // touching the transform logic.
 // ===========================================================================
 
+import { buildBrandedSearchSql } from './brandedSearchGroups.mjs';
+
 export const env = {
   // Secret — never exposed to the client.
   TW_API_KEY: process.env.TW_API_KEY ?? '',
@@ -62,43 +64,27 @@ export const tripleWhaleConfig = {
   // in the query; the adapter injects the requested range via `period`.
   // Docs: https://triplewhale.readme.io/reference/data-out-execute-custom-sql-query
   queries: {
-    googleOrganicSessions: {
+    googleTraffic: {
       weekColumn: 'week_start_monday',
-      valueColumn: 'non_paid_sessions',
+      fields: {
+        googleOrganicSessions: 'google_organic_traffic',
+        nonOrganicPageViews: 'google_non_organic_traffic',
+      },
       sql: `SELECT
-  toStartOfWeek(event_date, 1) AS week_start_monday,
-  SUM(sessions) AS non_paid_sessions
-FROM ga4_sessions_agg_table
-WHERE (
-  session_default_channel_group NOT IN (
-    'Paid Search',
-    'Paid Social',
-    'Paid Shopping',
-    'Paid Video',
-    'Paid Other',
-    'Cross-network',
-    'Display'
-  )
-  OR session_default_channel_group IS NULL
-)
-  AND event_date BETWEEN @startDate AND @endDate
-GROUP BY week_start_monday
-ORDER BY week_start_monday`,
-    },
-    nonOrganicPageViews: {
-      weekColumn: 'week_start_monday',
-      valueColumn: 'non_organic_page_views',
-      sql: `SELECT
-  toStartOfWeek(event_date, 1) AS week_start_monday,
-  SUM(screen_page_views) AS non_organic_page_views,
-  SUM(sessions) AS non_organic_sessions
-FROM ga4_sessions_agg_table
-WHERE session_default_channel_group NOT IN (
-  'Organic Search',
-  'Organic Social',
-  'Organic Video'
-)
-  AND event_date BETWEEN @startDate AND @endDate
+  toStartOfWeek(gsa.event_date, 1) AS week_start_monday,
+  SUMIf(
+    gsa.total_users,
+    gsa.session_default_channel_group = 'Organic Search'
+    AND gsa.session_source ILIKE '%google%'
+  ) AS google_organic_traffic,
+  SUMIf(
+    gsa.total_users,
+    gsa.session_default_channel_group != 'Organic Search'
+    AND gsa.session_source ILIKE '%google%'
+  ) AS google_non_organic_traffic
+FROM ga4_sessions_agg_table AS gsa
+WHERE gsa.event_date BETWEEN @startDate AND @endDate
+  AND gsa.session_source ILIKE '%google%'
 GROUP BY week_start_monday
 ORDER BY week_start_monday`,
     },
@@ -163,6 +149,17 @@ GROUP BY
   week_end
 ORDER BY
   week_start`,
+    },
+    brandedSearch: {
+      productDimensional: true,
+      weekColumn: 'week_start_monday',
+      productColumn: 'product_group',
+      fields: {
+        volume: 'branded_search_volume',
+        clicks: 'branded_search_clicks',
+        avgPosition: 'avg_position',
+      },
+      sql: buildBrandedSearchSql(),
     },
   },
 };

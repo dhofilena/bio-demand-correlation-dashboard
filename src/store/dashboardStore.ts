@@ -1,266 +1,307 @@
-import { create } from 'zustand';
-import type { CsvConnection, MetricKey, SourceHealth, WeeklyRecord } from '../types';
-import { buildLiveDataset } from '../services/dataService';
-import { fetchSheetsStatus, loadWeeklyRecordsFromGoogleSheet, syncGoogleSheets } from '../services/sheetsService';
-import type { LagWeek } from '../lib/correlation';
-
-export type TabId = 'timeline' | 'scorecard' | 'summary';
-export type ValueMode = 'absolute' | 'indexed';
-export type LagSetting = LagWeek | 'auto';
-export type Theme = 'light' | 'dark';
-
-const DEFAULT_CSV_CONNECTION: CsvConnection = {
-  status: 'idle',
-  source: null,
-  label: 'No CSV connected',
-  weekCount: 0,
-  connectedAt: null,
-  detail: 'Upload a CSV or connect a Google Sheet',
-  tabs: [],
-};
-
-interface DashboardState {
-  status: 'idle' | 'loading' | 'ready' | 'error';
-  error: string | null;
-  warning?: string;
-  records: WeeklyRecord[];
-  health: SourceHealth[];
-  csvRecords: WeeklyRecord[] | null;
-  csvConnection: CsvConnection;
-  lastUpdated: string | null;
-
-  dateRange: { start: string; end: string };
-  theme: Theme;
-  activeTab: TabId;
-  valueMode: ValueMode;
-  lag: LagSetting;
-  visible: Record<MetricKey, boolean>;
-
-  bootstrap: () => Promise<void>;
-  connectGoogleSheet: () => Promise<boolean>;
-  syncGoogleSheet: () => Promise<boolean>;
-  connectLive: () => Promise<void>;
-  refresh: () => Promise<void>;
-  setCsv: (records: WeeklyRecord[], meta?: { label?: string }) => void;
-  clearCsv: () => void;
-  setTab: (tab: TabId) => void;
-  setValueMode: (mode: ValueMode) => void;
-  setLag: (lag: LagSetting) => void;
-  toggleSeries: (key: MetricKey) => void;
-  setDateRange: (start: string, end: string) => void;
-  toggleTheme: () => void;
-}
-
-const DEFAULT_RANGE = { start: '2026-03-16', end: '2026-06-21' };
-
-const DEFAULT_VISIBLE: Record<MetricKey, boolean> = {
-  influencerPosts: false,
-  profilePosted: true,
-  socialImpressions: true,
-  socialReach: true,
-  socialEngagement: true,
-  mediaPosted: true,
-  emv: true,
-  podcastImpressions: true,
-  podcastIpModellingRevenue: true,
-  podcastLastClickSales: true,
-  podcastIpSalesMultiplier: true,
-  googleOrganicSessions: true,
-  nonOrganicPageViews: false,
-  gaOrganicRevenue: false,
-  gaPaidRevenue: false,
-  gaSocialRevenue: false,
-  gaOtherRevenue: false,
-  amazonOrganicRevenue: false,
-  amazonPpcRevenue: false,
-  dtcRevenue: false,
-  instagramPosts: false,
-  tiktokPosts: false,
-  podcastAdSpend: false,
-};
-
-export const useDashboard = create<DashboardState>((set, get) => ({
-  status: 'idle',
-  error: null,
-  records: [],
-  health: [],
-  csvRecords: null,
-  csvConnection: DEFAULT_CSV_CONNECTION,
-  lastUpdated: null,
-  dateRange: DEFAULT_RANGE,
-  theme: 'light',
-  activeTab: 'timeline',
-  valueMode: 'indexed',
-  lag: 0,
-  visible: DEFAULT_VISIBLE,
-
-  bootstrap: async () => {
-    await get().connectLive();
-  },
-
-  connectGoogleSheet: async () => {
-    set((s) => ({
-      csvConnection: {
-        ...s.csvConnection,
-        status: 'loading',
-        detail: 'Loading cached Google Sheet…',
-      },
-    }));
-
-    try {
-      const status = await fetchSheetsStatus();
-      if (!status.enabled || !status.configured) {
-        set({
-          csvConnection: {
-            status: 'disabled',
-            source: null,
-            label: 'Google Sheets off',
-            weekCount: 0,
-            connectedAt: null,
-            detail: 'Set GOOGLE_SHEETS_ENABLED=true and credentials in .env',
-            tabs: [],
-          },
-        });
-        return false;
-      }
-
-      if (!status.cache?.available) {
-        set({
-          csvConnection: {
-            status: 'error',
-            source: 'google-sheets',
-            label: 'Google Sheet',
-            weekCount: 0,
-            connectedAt: null,
-            detail: 'No cached sheet data. Run `npm run sheets:sync` or click Sync from Google in Upload CSV.',
-            tabs: [],
-          },
-        });
-        return false;
-      }
-
-      const loaded = await loadWeeklyRecordsFromGoogleSheet();
-      const tabCount = loaded.tabs.length;
-      const tabSummary = loaded.tabs
-        .map((t) => `${t.label}: ${t.rowCount} rows`)
-        .join(' · ');
-      set({
-        csvRecords: loaded.records,
-        csvConnection: {
-          status: 'connected',
-          source: 'google-sheets',
-          label: tabCount > 1 ? `Google Sheets (${tabCount} tabs)` : loaded.tabs[0]?.label ?? 'Google Sheet',
-          weekCount: loaded.records.length,
-          connectedAt: loaded.fetchedAt,
-          detail: `${loaded.records.length} merged weeks · cached · ${tabSummary}`,
-          tabs: loaded.tabs.map((t) => ({
-            gid: t.gid,
-            label: t.label,
-            weekCount: t.rowCount,
-            detail: `${t.mappedColumns} columns mapped`,
-          })),
-        },
-      });
-      void get().refresh();
-      return true;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      set({
-        csvConnection: {
-          status: 'error',
-          source: 'google-sheets',
-          label: 'Google Sheet',
-          weekCount: 0,
-          connectedAt: null,
-          detail: message,
-          tabs: [],
-        },
-      });
-      return false;
-    }
-  },
-
-  syncGoogleSheet: async () => {
-    set((s) => ({
-      csvConnection: {
-        ...s.csvConnection,
-        status: 'loading',
-        detail: 'Syncing from Google Sheet…',
-      },
-    }));
-
-    try {
-      await syncGoogleSheets();
-      return await get().connectGoogleSheet();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      set({
-        csvConnection: {
-          status: 'error',
-          source: 'google-sheets',
-          label: 'Google Sheet',
-          weekCount: 0,
-          connectedAt: null,
-          detail: message,
-          tabs: [],
-        },
-      });
-      return false;
-    }
-  },
-
-  connectLive: async () => {
-    const { dateRange, csvRecords } = get();
-    set({ status: 'loading', error: null });
-    try {
-      const result = await buildLiveDataset(dateRange.start, dateRange.end, csvRecords);
-      set({
-        status: 'ready',
-        records: result.records,
-        health: result.health,
-        warning: result.warning,
-        lastUpdated: new Date().toISOString(),
-      });
-    } catch (err) {
-      set({ status: 'error', error: err instanceof Error ? err.message : String(err) });
-    }
-  },
-
-  refresh: async () => {
-    await get().connectLive();
-  },
-
-  setCsv: (records, meta) => {
-    set({
-      csvRecords: records,
-      csvConnection: {
-        status: 'connected',
-        source: 'upload',
-        label: meta?.label ?? 'Uploaded CSV',
-        weekCount: records.length,
-        connectedAt: new Date().toISOString(),
-        detail: `${records.length} weeks loaded from upload`,
-        tabs: [],
-      },
-    });
-    void get().refresh();
-  },
-
-  clearCsv: () => {
-    set({
-      csvRecords: null,
-      csvConnection: DEFAULT_CSV_CONNECTION,
-    });
-    void get().refresh();
-  },
-
-  setTab: (activeTab) => set({ activeTab }),
-  setValueMode: (valueMode) => set({ valueMode }),
-  setLag: (lag) => set({ lag }),
-  toggleSeries: (key) => set((s) => ({ visible: { ...s.visible, [key]: !s.visible[key] } })),
-  setDateRange: (start, end) => {
-    set({ dateRange: { start, end } });
-    void get().refresh();
-  },
-  toggleTheme: () => set((s) => ({ theme: s.theme === 'light' ? 'dark' : 'light' })),
-}));
+import { create } from 'zustand';
+import type { BrandedSearchData, CsvConnection, MetricKey, SourceHealth, WeeklyRecord } from '../types';
+import { BRANDED_SEARCH_TOTAL } from '../config/metrics';
+import type { BrandedSearchSelection } from '../lib/brandedSearch';
+import { buildLiveDataset } from '../services/dataService';
+import { fetchSheetsStatus, loadWeeklyRecordsFromGoogleSheet, syncGoogleSheets } from '../services/sheetsService';
+import type { LagWeek } from '../lib/correlation';
+
+export type TabId = 'timeline' | 'scorecard' | 'summary';
+export type ValueMode = 'absolute' | 'indexed';
+export type LagSetting = LagWeek | 'auto';
+export type Theme = 'light' | 'dark';
+
+const DEFAULT_CSV_CONNECTION: CsvConnection = {
+  status: 'idle',
+  source: null,
+  label: 'No CSV connected',
+  weekCount: 0,
+  connectedAt: null,
+  detail: 'Upload a CSV or connect a Google Sheet',
+  tabs: [],
+};
+
+interface DashboardState {
+  status: 'idle' | 'loading' | 'ready' | 'error';
+  error: string | null;
+  warning?: string;
+  records: WeeklyRecord[];
+  brandedSearch: BrandedSearchData | null;
+  brandedSearchProduct: BrandedSearchSelection;
+  health: SourceHealth[];
+  csvRecords: WeeklyRecord[] | null;
+  csvConnection: CsvConnection;
+  lastUpdated: string | null;
+
+  dateRange: { start: string; end: string };
+  theme: Theme;
+  activeTab: TabId;
+  valueMode: ValueMode;
+  lag: LagSetting;
+  visible: Record<MetricKey, boolean>;
+  pendingScatterJump: {
+    signalKey: MetricKey;
+    demandKey: MetricKey;
+    lag: LagWeek;
+    requestId: number;
+  } | null;
+
+  bootstrap: () => Promise<void>;
+  connectGoogleSheet: () => Promise<boolean>;
+  syncGoogleSheet: () => Promise<boolean>;
+  connectLive: () => Promise<void>;
+  refresh: () => Promise<void>;
+  setCsv: (records: WeeklyRecord[], meta?: { label?: string }) => void;
+  clearCsv: () => void;
+  setTab: (tab: TabId) => void;
+  setValueMode: (mode: ValueMode) => void;
+  setLag: (lag: LagSetting) => void;
+  toggleSeries: (key: MetricKey) => void;
+  setBrandedSearchProduct: (product: BrandedSearchSelection) => void;
+  setDateRange: (start: string, end: string) => void;
+  toggleTheme: () => void;
+  focusScatterFromScorecard: (signalKey: MetricKey, demandKey: MetricKey, lag: LagWeek) => void;
+  clearPendingScatterJump: () => void;
+}
+
+const DEFAULT_RANGE = { start: '2026-03-16', end: '2026-06-21' };
+
+const DEFAULT_VISIBLE: Record<MetricKey, boolean> = {
+  influencerPosts: false,
+  profilePosted: true,
+  socialImpressions: true,
+  socialReach: true,
+  socialEngagement: true,
+  mediaPosted: true,
+  emv: true,
+  podcastImpressions: true,
+  podcastIpModellingRevenue: true,
+  podcastLastClickSales: true,
+  podcastIpSalesMultiplier: true,
+  googleOrganicSessions: true,
+  nonOrganicPageViews: false,
+  gaOrganicRevenue: false,
+  gaPaidRevenue: false,
+  gaSocialRevenue: false,
+  gaOtherRevenue: false,
+  amazonOrganicRevenue: false,
+  amazonPpcRevenue: false,
+  dtcRevenue: false,
+  brandedSearchVolume: false,
+  instagramPosts: false,
+  tiktokPosts: false,
+  podcastAdSpend: false,
+};
+
+export const useDashboard = create<DashboardState>((set, get) => ({
+  status: 'idle',
+  error: null,
+  records: [],
+  brandedSearch: null,
+  brandedSearchProduct: BRANDED_SEARCH_TOTAL,
+  health: [],
+  csvRecords: null,
+  csvConnection: DEFAULT_CSV_CONNECTION,
+  lastUpdated: null,
+  dateRange: DEFAULT_RANGE,
+  theme: 'light',
+  activeTab: 'timeline',
+  valueMode: 'indexed',
+  lag: 0,
+  visible: DEFAULT_VISIBLE,
+  pendingScatterJump: null,
+
+  bootstrap: async () => {
+    await get().connectLive();
+  },
+
+  connectGoogleSheet: async () => {
+    set((s) => ({
+      csvConnection: {
+        ...s.csvConnection,
+        status: 'loading',
+        detail: 'Loading cached Google Sheet…',
+      },
+    }));
+
+    try {
+      const status = await fetchSheetsStatus();
+      if (!status.enabled || !status.configured) {
+        set({
+          csvConnection: {
+            status: 'disabled',
+            source: null,
+            label: 'Google Sheets off',
+            weekCount: 0,
+            connectedAt: null,
+            detail: 'Set GOOGLE_SHEETS_ENABLED=true and credentials in .env',
+            tabs: [],
+          },
+        });
+        return false;
+      }
+
+      if (!status.cache?.available) {
+        set({
+          csvConnection: {
+            status: 'error',
+            source: 'google-sheets',
+            label: 'Google Sheet',
+            weekCount: 0,
+            connectedAt: null,
+            detail: 'No cached sheet data. Run `npm run sheets:sync` or click Sync from Google in Upload CSV.',
+            tabs: [],
+          },
+        });
+        return false;
+      }
+
+      const loaded = await loadWeeklyRecordsFromGoogleSheet();
+      const tabCount = loaded.tabs.length;
+      const tabSummary = loaded.tabs
+        .map((t) => `${t.label}: ${t.rowCount} rows`)
+        .join(' · ');
+      set({
+        csvRecords: loaded.records,
+        csvConnection: {
+          status: 'connected',
+          source: 'google-sheets',
+          label: tabCount > 1 ? `Google Sheets (${tabCount} tabs)` : loaded.tabs[0]?.label ?? 'Google Sheet',
+          weekCount: loaded.records.length,
+          connectedAt: loaded.fetchedAt,
+          detail: `${loaded.records.length} merged weeks · cached · ${tabSummary}`,
+          tabs: loaded.tabs.map((t) => ({
+            gid: t.gid,
+            label: t.label,
+            weekCount: t.rowCount,
+            detail: `${t.mappedColumns} columns mapped`,
+          })),
+        },
+      });
+      void get().refresh();
+      return true;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      set({
+        csvConnection: {
+          status: 'error',
+          source: 'google-sheets',
+          label: 'Google Sheet',
+          weekCount: 0,
+          connectedAt: null,
+          detail: message,
+          tabs: [],
+        },
+      });
+      return false;
+    }
+  },
+
+  syncGoogleSheet: async () => {
+    set((s) => ({
+      csvConnection: {
+        ...s.csvConnection,
+        status: 'loading',
+        detail: 'Syncing from Google Sheet…',
+      },
+    }));
+
+    try {
+      await syncGoogleSheets();
+      return await get().connectGoogleSheet();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      set({
+        csvConnection: {
+          status: 'error',
+          source: 'google-sheets',
+          label: 'Google Sheet',
+          weekCount: 0,
+          connectedAt: null,
+          detail: message,
+          tabs: [],
+        },
+      });
+      return false;
+    }
+  },
+
+  connectLive: async () => {
+    const { dateRange, csvRecords } = get();
+    set({ status: 'loading', error: null });
+    try {
+      const result = await buildLiveDataset(dateRange.start, dateRange.end, csvRecords);
+      set({
+        status: 'ready',
+        records: result.records,
+        brandedSearch: result.brandedSearch,
+        health: result.health,
+        warning: result.warning,
+        lastUpdated: new Date().toISOString(),
+      });
+    } catch (err) {
+      set({ status: 'error', error: err instanceof Error ? err.message : String(err) });
+    }
+  },
+
+  refresh: async () => {
+    await get().connectLive();
+  },
+
+  setCsv: (records, meta) => {
+    set({
+      csvRecords: records,
+      csvConnection: {
+        status: 'connected',
+        source: 'upload',
+        label: meta?.label ?? 'Uploaded CSV',
+        weekCount: records.length,
+        connectedAt: new Date().toISOString(),
+        detail: `${records.length} weeks loaded from upload`,
+        tabs: [],
+      },
+    });
+    void get().refresh();
+  },
+
+  clearCsv: () => {
+    set({
+      csvRecords: null,
+      csvConnection: DEFAULT_CSV_CONNECTION,
+    });
+    void get().refresh();
+  },
+
+  setTab: (activeTab) => set({ activeTab }),
+  setValueMode: (valueMode) => set({ valueMode }),
+  setLag: (lag) => set({ lag }),
+  toggleSeries: (key) => set((s) => ({ visible: { ...s.visible, [key]: !s.visible[key] } })),
+  setBrandedSearchProduct: (brandedSearchProduct) => set({ brandedSearchProduct }),
+  focusScatterFromScorecard: (signalKey, demandKey, lag) =>
+    set(() => {
+      const nextVisible = Object.keys(DEFAULT_VISIBLE).reduce((acc, key) => {
+        acc[key as MetricKey] = false;
+        return acc;
+      }, {} as Record<MetricKey, boolean>);
+      nextVisible[signalKey] = true;
+      nextVisible[demandKey] = true;
+
+      return {
+        activeTab: 'timeline',
+        lag,
+        visible: nextVisible,
+        pendingScatterJump: {
+          signalKey,
+          demandKey,
+          lag,
+          requestId: Date.now() + Math.random(),
+        },
+      };
+    }),
+  clearPendingScatterJump: () => set({ pendingScatterJump: null }),
+  setDateRange: (start, end) => {
+    set({ dateRange: { start, end } });
+    void get().refresh();
+  },
+  toggleTheme: () => set((s) => ({ theme: s.theme === 'light' ? 'dark' : 'light' })),
+}));

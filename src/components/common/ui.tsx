@@ -1,6 +1,7 @@
 import type { Confidence, StatusLabel } from '../../types';
 import { ArrowDown, ArrowRight, ArrowUp } from './icons';
 import { formatPct } from '../../lib/format';
+import { RELATIONSHIP_STRENGTH_LABELS } from '../../lib/marketingLabels';
 
 const STATUS_CLASS: Record<StatusLabel, string> = {
   Strong: 'badge-strong',
@@ -41,6 +42,10 @@ const CONF_CLASS: Record<Confidence, string> = {
 
 export function ConfidenceBadge({ level }: { level: Confidence }) {
   return <span className={`pill ${CONF_CLASS[level]}`}>{level} confidence</span>;
+}
+
+export function RelationshipStrengthBadge({ level }: { level: Confidence }) {
+  return <span className={`pill ${CONF_CLASS[level]}`}>{RELATIONSHIP_STRENGTH_LABELS[level]}</span>;
 }
 
 export function Dot({ color, size = 8 }: { color: string; size?: number }) {

@@ -91,7 +91,7 @@ export function generateInsights(records: WeeklyRecord[]): Insight[] {
     }
   }
 
-  // 2) Google Paid Sessions + branded awareness.
+  // 2) Google Non-Organic Traffic + branded awareness.
   const nonOrganicPv = lastWeekState(records, 'nonOrganicPageViews');
   const emv = lastWeekState(records, 'emv');
   if (nonOrganicPv.spiked && (emv.vsRollingPct ?? 0) > 0) {
@@ -99,9 +99,9 @@ export function generateInsights(records: WeeklyRecord[]): Insight[] {
       id: 'non-organic-awareness',
       kind: 'demand-strength',
       confidence: 'Medium',
-      title: 'Google Paid Sessions rising with awareness',
-      text: `Google Paid Sessions are ${formatPct(nonOrganicPv.vsRollingPct)} vs baseline as earned media value also rose. Rising paid traffic alongside awareness activity is consistent with growing branded interest.`,
-      evidence: 'Google Paid Sessions above baseline coincides with elevated EMV.',
+      title: 'Google Non-Organic Traffic rising with awareness',
+      text: `Google Non-Organic Traffic is ${formatPct(nonOrganicPv.vsRollingPct)} vs baseline as earned media value also rose. Rising non-organic Google traffic alongside awareness activity is consistent with growing branded interest.`,
+      evidence: 'Google Non-Organic Traffic above baseline coincides with elevated EMV.',
     });
   }
 
@@ -125,8 +125,8 @@ export function generateInsights(records: WeeklyRecord[]): Insight[] {
       id: 'lag-podcast-organic',
       kind: 'content-led-lift',
       confidence: pod.confidence,
-      title: 'Podcast impressions appear to lead organic sessions',
-      text: `Podcast impressions tend to precede Google organic session growth by about ${pod.bestLag} week${
+      title: 'Podcast impressions appear to lead Google organic traffic',
+      text: `Podcast impressions tend to precede Google Organic Traffic growth by about ${pod.bestLag} week${
         pod.bestLag > 1 ? 's' : ''
       }. Treat podcast pushes as an early indicator for organic demand.`,
       evidence: `Best fit at lag ${pod.bestLag}w, r=${pod.r.toFixed(2)}.`,
@@ -138,8 +138,8 @@ export function generateInsights(records: WeeklyRecord[]): Insight[] {
       id: 'lag-organic-dtc',
       kind: 'demand-strength',
       confidence: organicDtc.confidence,
-      title: 'Organic sessions appear to lead DTC revenue',
-      text: `Google organic sessions tend to precede DTC revenue movement by about ${organicDtc.bestLag} week${
+      title: 'Google organic traffic appears to lead DTC revenue',
+      text: `Google Organic Traffic tends to precede DTC revenue movement by about ${organicDtc.bestLag} week${
         organicDtc.bestLag > 1 ? 's' : ''
       }. Rising website traffic is a useful early read on whether DTC revenue will follow through.`,
       evidence: `Best fit at lag ${organicDtc.bestLag}w, r=${organicDtc.r.toFixed(2)}.`,

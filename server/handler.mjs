@@ -1,6 +1,6 @@
 import { env } from './config.mjs';
 import { normalizeDemandPeriod } from './dates.mjs';
-import { fetchMockDemand } from './adapters/mockDemand.mjs';
+import { fetchMockDemand, fetchMockBrandedSearch } from './adapters/mockDemand.mjs';
 import { fetchTripleWhaleWeekly } from './adapters/tripleWhaleAdapter.mjs';
 
 // ===========================================================================
@@ -47,6 +47,7 @@ export async function getWeeklyDemand(q) {
         source: 'mock',
         generatedAt: new Date().toISOString(),
         weeks: fetchMockDemand(period.start, period.end),
+        brandedSearch: fetchMockBrandedSearch(period.start, period.end),
         health: [
           {
             id: 'triple-whale',
@@ -61,8 +62,11 @@ export async function getWeeklyDemand(q) {
 
   // --- Live mode: each adapter fails independently and falls back to mock. ---
   let tw = [];
+  let brandedSearch = null;
   try {
-    tw = await fetchTripleWhaleWeekly(period.start, period.end);
+    const result = await fetchTripleWhaleWeekly(period.start, period.end);
+    tw = result.weeks;
+    brandedSearch = result.brandedSearch;
     health.push({ id: 'triple-whale', label: 'Triple Whale', status: 'live', detail: `${tw.length} weeks` });
   } catch (err) {
     tw = fetchMockDemand(period.start, period.end).map((r) => ({
@@ -76,6 +80,7 @@ export async function getWeeklyDemand(q) {
       gaOtherRevenue: r.gaOtherRevenue,
       dtcRevenue: r.dtcRevenue,
     }));
+    brandedSearch = fetchMockBrandedSearch(period.start, period.end);
     health.push({ id: 'triple-whale', label: 'Triple Whale', status: 'error', detail: String(err.message || err) });
   }
 
@@ -86,6 +91,7 @@ export async function getWeeklyDemand(q) {
       source: 'triple-whale',
       generatedAt: new Date().toISOString(),
       weeks: mergeByWeek(tw),
+      brandedSearch: brandedSearch ?? { products: [], byProduct: {}, total: [] },
       health,
       warning: degraded ? 'One or more live sources failed; mock values were substituted.' : undefined,
     },

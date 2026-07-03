@@ -3,6 +3,37 @@ import type { Confidence, LagResult, MetricKey, WeeklyRecord } from '../types';
 export const LAG_WEEKS = [0, 1, 2, 3, 4] as const;
 export type LagWeek = (typeof LAG_WEEKS)[number];
 
+/** Ordinary least-squares fit y = slope * x + intercept. */
+export function linearRegression(xs: number[], ys: number[]): { slope: number; intercept: number } | null {
+  const n = Math.min(xs.length, ys.length);
+  if (n < 2) return null;
+  let sx = 0;
+  let sy = 0;
+  let sxx = 0;
+  let sxy = 0;
+  for (let i = 0; i < n; i++) {
+    sx += xs[i];
+    sy += ys[i];
+    sxx += xs[i] * xs[i];
+    sxy += xs[i] * ys[i];
+  }
+  const den = n * sxx - sx * sx;
+  if (den === 0) return null;
+  const slope = (n * sxy - sx * sy) / den;
+  const intercept = (sy - slope * sx) / n;
+  return { slope, intercept };
+}
+
+/** Trend-line angle in data coordinates (degrees). 45° = slope 1 (y rises 1:1 with x). */
+export function trendAngleDegrees(slope: number): number {
+  return (Math.atan(slope) * 180) / Math.PI;
+}
+
+/** Share of demand variance explained by the linear trend (r²). 1.0 = perfect fit. */
+export function rSquared(r: number): number {
+  return r * r;
+}
+
 /** Pearson correlation over paired, finite samples. Returns 0 if undefined. */
 export function pearson(a: number[], b: number[]): number {
   const n = Math.min(a.length, b.length);
@@ -80,6 +111,63 @@ export function confidenceFromR(r: number): Confidence {
   if (a >= 0.35) return 'Medium';
   return 'Low';
 }
+
+export type FitTier = 'close' | 'moderate' | 'far';
+
+export interface PointFit {
+  predicted: number;
+  residual: number;
+  absResidual: number;
+  tier: FitTier;
+}
+
+const FIT_TIER_THRESHOLDS = { close: 0.5, moderate: 1.0 } as const;
+
+/** Per-point distance from the OLS trend line, tiered by |residual| / σ(y). */
+export function pointFitFromRegression(
+  xs: number[],
+  ys: number[],
+  reg: { slope: number; intercept: number },
+): PointFit[] {
+  const n = Math.min(xs.length, ys.length);
+  if (n === 0) return [];
+
+  let sy = 0;
+  for (let i = 0; i < n; i++) sy += ys[i];
+  const my = sy / n;
+  let vy = 0;
+  for (let i = 0; i < n; i++) {
+    const d = ys[i] - my;
+    vy += d * d;
+  }
+  const stdY = Math.sqrt(vy / n) || 1;
+
+  return xs.slice(0, n).map((x, i) => {
+    const predicted = reg.slope * x + reg.intercept;
+    const residual = ys[i] - predicted;
+    const absResidual = Math.abs(residual);
+    const z = absResidual / stdY;
+    const tier: FitTier =
+      z <= FIT_TIER_THRESHOLDS.close
+        ? 'close'
+        : z <= FIT_TIER_THRESHOLDS.moderate
+          ? 'moderate'
+          : 'far';
+    return { predicted, residual, absResidual, tier };
+  });
+}
+
+export const FIT_TIER_COLORS: Record<FitTier, string> = {
+  close: 'var(--strong)',
+  moderate: 'var(--moderate)',
+  far: 'var(--soft)',
+};
+
+export const FIT_TIER_LABELS: Record<FitTier, string> = {
+  close: 'On trend',
+  moderate: 'Slightly off',
+  far: 'Off trend',
+};
 
 /** Detect the strongest content→demand lead relationship for a demand channel. */
 export function bestLeadingSignal(

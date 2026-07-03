@@ -1,4 +1,4 @@
-import type { DemandApiResponse, SourceHealth, WeeklyRecord } from '../types';
+import type { BrandedSearchData, DemandApiResponse, SourceHealth, WeeklyRecord } from '../types';
 import { mergeWeekly } from './csvIngest';
 import { normalizeDemandPeriod, weekStartInRange } from '../lib/dateRange';
 
@@ -8,6 +8,7 @@ import { normalizeDemandPeriod, weekStartInRange } from '../lib/dateRange';
 
 export interface DatasetResult {
   records: WeeklyRecord[];
+  brandedSearch: BrandedSearchData | null;
   health: SourceHealth[];
   warning?: string;
 }
@@ -44,6 +45,7 @@ export async function buildLiveDataset(
 
   return {
     records,
+    brandedSearch: api.brandedSearch ?? null,
     warning: api.warning,
     health: [
       {

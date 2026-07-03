@@ -73,6 +73,7 @@ export function applyMapping(rows: Record<string, string>[], mapping: ColumnMapp
       amazonOrganicRevenue: null,
       amazonPpcRevenue: null,
       dtcRevenue: null,
+      brandedSearchVolume: null,
     };
     METRIC_KEYS.forEach((key) => {
       const col = mapping[key];

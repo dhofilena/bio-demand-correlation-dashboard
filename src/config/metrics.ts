@@ -17,6 +17,7 @@ export const COLORS = {
   gaPaidRev: '#7c3aed',
   gaSocialRev: '#db2777',
   gaOtherRev: '#94a3b8',
+  brandedSearch: '#0d9488',
 } as const;
 
 /** Canonical metric registry — drives charts, KPI strip, scorecard and formatting. */
@@ -149,23 +150,23 @@ export const METRICS: Record<MetricKey, MetricDef> = {
   },
   googleOrganicSessions: {
     key: 'googleOrganicSessions',
-    label: 'Google Organic Sessions',
-    short: 'Google Organic Sessions',
+    label: 'Google Organic Traffic',
+    short: 'Google Organic Traffic',
     group: 'demand',
     unit: 'count',
     color: COLORS.organic,
     isDemandChannel: true,
-    description: 'GA4 sessions excluding paid and display channel groups (Triple Whale).',
+    description: 'GA4 total users from Google where session channel group is Organic Search (Triple Whale).',
   },
   nonOrganicPageViews: {
     key: 'nonOrganicPageViews',
-    label: 'Google Paid Sessions',
-    short: 'Google Paid Sessions',
+    label: 'Google Non-Organic Traffic',
+    short: 'Google Non-Organic Traffic',
     group: 'demand',
     unit: 'count',
     color: COLORS.nonOrganic,
     isDemandChannel: true,
-    description: 'GA4 page views excluding organic search, social and video channel groups (Triple Whale).',
+    description: 'GA4 total users from Google where session channel group is not Organic Search (Triple Whale).',
   },
   gaOrganicRevenue: {
     key: 'gaOrganicRevenue',
@@ -237,6 +238,17 @@ export const METRICS: Record<MetricKey, MetricDef> = {
     isDemandChannel: true,
     description: 'Website order revenue excluding Amazon (Triple Whale orders_table).',
   },
+  brandedSearchVolume: {
+    key: 'brandedSearchVolume',
+    label: 'Google Branded Search',
+    short: 'Branded search',
+    group: 'demand',
+    unit: 'count',
+    color: COLORS.brandedSearch,
+    isDemandChannel: true,
+    description:
+      'Google branded search impressions grouped by product line (Magnesium Breakthrough, MassZymes, Brand / BIOptimizers, etc.) from search_terms × keyword rules.',
+  },
 };
 
 export const METRIC_LIST: MetricDef[] = Object.values(METRICS);
@@ -271,6 +283,11 @@ export const CONTENT_KEYS: MetricKey[] = [...SOCIAL_SIGNAL_KEYS, ...PODSCRIBE_SI
 
 /** Upstream content metrics shown in the scorecard weekly matrix. */
 export const CONTENT_SIGNAL_KEYS: MetricKey[] = [...SOCIAL_SIGNAL_KEYS, ...PODSCRIBE_SIGNAL_KEYS];
+
+/** Sentinel value for the shop-wide branded search total in product pickers. */
+export const BRANDED_SEARCH_TOTAL = '__total__';
+
+export const BRANDED_SEARCH_METRIC_KEY = 'brandedSearchVolume' as const;
 
 /** Demand channels shown in the scorecard, in display order. */
 export const DEMAND_CHANNELS: MetricKey[] = [

@@ -1,4 +1,5 @@
 import { env, tripleWhaleConfig as cfg } from '../config.mjs';
+import { brandedSearchGroupOrder } from '../brandedSearchGroups.mjs';
 import { mondayOf, weekLabel } from '../dates.mjs';
 
 // ===========================================================================
@@ -19,9 +20,17 @@ export async function fetchTripleWhaleWeekly(start, end) {
   if (!entries.length) throw new Error('No Triple Whale SQL queries configured');
 
   const byWeek = new Map();
+  /** @type {import('../../src/types/index.ts').BrandedSearchData | null} */
+  let brandedSearch = null;
 
   for (const [field, queryCfg] of entries) {
     const rows = await executeSqlQuery(start, end, queryCfg.sql);
+
+    if (queryCfg.productDimensional) {
+      brandedSearch = transformBrandedSearchRows(rows, queryCfg);
+      continue;
+    }
+
     const weekRows = queryCfg.fields
       ? transformMultiFieldSqlRows(rows, queryCfg)
       : transformSqlRows(rows, queryCfg, field);
@@ -37,7 +46,7 @@ export async function fetchTripleWhaleWeekly(start, end) {
   if (!weeks.length) {
     throw new Error('Triple Whale SQL returned no weekly rows for the requested range');
   }
-  return weeks;
+  return { weeks, brandedSearch };
 }
 
 /**
@@ -116,4 +125,81 @@ export function transformMultiFieldSqlRows(rows, queryCfg) {
     }
     return out;
   });
+}
+
+/**
+ * Product-dimensional branded search rows → per-product weekly series + shop total.
+ * @param {Array<Record<string, unknown>>} rows
+ * @param {{ weekColumn: string, productColumn: string, fields: Record<string, string> }} queryCfg
+ */
+export function transformBrandedSearchRows(rows, queryCfg) {
+  const { weekColumn, productColumn, fields } = queryCfg;
+  const byProduct = new Map();
+  const totalByWeek = new Map();
+
+  for (const row of rows) {
+    const iso = mondayOf(String(row[weekColumn] ?? ''));
+    const product = String(row[productColumn] ?? '').trim();
+    if (!iso || !product) continue;
+
+    const point = {
+      weekStart: iso,
+      weekLabel: weekLabel(iso),
+      volume: readMetric(row, fields.volume),
+      clicks: readMetric(row, fields.clicks),
+      avgPosition: readMetric(row, fields.avgPosition),
+    };
+
+    const productSeries = byProduct.get(product) ?? [];
+    productSeries.push(point);
+    byProduct.set(product, productSeries);
+
+    const total = totalByWeek.get(iso) ?? {
+      weekStart: iso,
+      weekLabel: weekLabel(iso),
+      volume: 0,
+      clicks: 0,
+      positionWeighted: 0,
+      positionWeight: 0,
+    };
+    if (point.volume !== null) total.volume += point.volume;
+    if (point.clicks !== null) total.clicks += point.clicks;
+    if (point.avgPosition !== null && point.volume !== null && point.volume > 0) {
+      total.positionWeighted += point.avgPosition * point.volume;
+      total.positionWeight += point.volume;
+    }
+    totalByWeek.set(iso, total);
+  }
+
+  const products = [...byProduct.keys()].sort((a, b) => {
+    const order = brandedSearchGroupOrder();
+    const ai = order.indexOf(a);
+    const bi = order.indexOf(b);
+    if (ai !== -1 && bi !== -1) return ai - bi;
+    if (ai !== -1) return -1;
+    if (bi !== -1) return 1;
+    return a.localeCompare(b);
+  });
+  const normalizedByProduct = {};
+  for (const [product, series] of byProduct.entries()) {
+    normalizedByProduct[product] = [...series].sort((a, b) => a.weekStart.localeCompare(b.weekStart));
+  }
+
+  const total = [...totalByWeek.values()]
+    .sort((a, b) => a.weekStart.localeCompare(b.weekStart))
+    .map(({ weekStart, weekLabel: label, volume, clicks, positionWeighted, positionWeight }) => ({
+      weekStart,
+      weekLabel: label,
+      volume: volume || null,
+      clicks: clicks || null,
+      avgPosition:
+        positionWeight > 0 ? Math.round((positionWeighted / positionWeight) * 100) / 100 : null,
+    }));
+
+  return { products, byProduct: normalizedByProduct, total };
+}
+
+function readMetric(row, column) {
+  const v = Number(row[column]);
+  return Number.isFinite(v) ? v : null;
 }

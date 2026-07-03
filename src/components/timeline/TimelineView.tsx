@@ -1,12 +1,19 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useDashboard, type LagSetting } from '../../store/dashboardStore';
 import { METRICS, METRIC_LIST, CONTENT_KEYS, DEMAND_CHANNELS, SOCIAL_SIGNAL_KEYS, PODSCRIBE_SIGNAL_KEYS, signalToggleLabel } from '../../config/metrics';
 import type { MetricKey } from '../../types';
 import { lagCorrelation, bestLeadingSignal, LAG_WEEKS } from '../../lib/correlation';
 import { generateInsights } from '../../lib/insightEngine';
 import { TimelineChart } from './TimelineChart';
+import { TimelineScatterChart } from './TimelineScatterChart';
+import { ChartDataExport } from './ChartDataExport';
 import { InsightBanner } from './InsightBanner';
+import { buildScatterChartExport, buildTimelineChartExport } from '../../lib/chartExportData';
 import { Dot } from '../common/ui';
+import { BrandedSearchDemandControl } from '../demand/BrandedSearchControls';
+import { useEffectiveRecords } from '../../hooks/useEffectiveRecords';
+
+type ChartView = 'timeline' | 'scatter';
 
 const CONTENT_TOGGLES: MetricKey[] = [...SOCIAL_SIGNAL_KEYS, ...PODSCRIBE_SIGNAL_KEYS];
 const DEMAND_TOGGLES: MetricKey[] = DEMAND_CHANNELS;
@@ -53,14 +60,41 @@ function Segmented<T extends string | number>({ value, options, onChange }: { va
 }
 
 export function TimelineView() {
-  const records = useDashboard((s) => s.records);
+  const records = useEffectiveRecords();
   const visible = useDashboard((s) => s.visible);
   const valueMode = useDashboard((s) => s.valueMode);
   const setValueMode = useDashboard((s) => s.setValueMode);
   const lag = useDashboard((s) => s.lag);
   const setLag = useDashboard((s) => s.setLag);
+  const pendingScatterJump = useDashboard((s) => s.pendingScatterJump);
+  const clearPendingScatterJump = useDashboard((s) => s.clearPendingScatterJump);
+  const scatterCardRef = useRef<HTMLDivElement | null>(null);
 
   const visibleKeys = METRIC_LIST.map((m) => m.key).filter((k) => visible[k]);
+  const scatterPair = useMemo(() => {
+    const visibleSignals = visibleKeys.filter((k) => METRICS[k].group === 'content');
+    const visibleDemand = visibleKeys.filter((k) => METRICS[k].group === 'demand');
+    return visibleSignals.length === 1 && visibleDemand.length === 1
+      ? { signalKey: visibleSignals[0], demandKey: visibleDemand[0] }
+      : null;
+  }, [visibleKeys]);
+
+  const [chartView, setChartView] = useState<ChartView>('timeline');
+  const shouldForceScatter =
+    !!pendingScatterJump &&
+    !!scatterPair &&
+    pendingScatterJump.signalKey === scatterPair.signalKey &&
+    pendingScatterJump.demandKey === scatterPair.demandKey;
+  const activeChartView: ChartView =
+    shouldForceScatter ? 'scatter' : scatterPair ? chartView : 'timeline';
+
+  useEffect(() => {
+    if (!shouldForceScatter) return;
+    requestAnimationFrame(() => {
+      scatterCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    clearPendingScatterJump();
+  }, [shouldForceScatter, clearPendingScatterJump]);
 
   // Auto-detect the strongest content→demand lead across the standard pairs.
   const auto = useMemo(() => {
@@ -87,17 +121,44 @@ export function TimelineView() {
     ];
   }, [records]);
 
+  const chartExportData = useMemo(() => {
+    if (activeChartView === 'scatter' && scatterPair) {
+      return buildScatterChartExport(
+        records,
+        scatterPair.signalKey,
+        scatterPair.demandKey,
+        valueMode,
+        effectiveLag,
+      );
+    }
+    return buildTimelineChartExport(records, visibleKeys, valueMode, effectiveLag);
+  }, [activeChartView, scatterPair, records, visibleKeys, valueMode, effectiveLag]);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <div className="card" style={{ padding: 16 }}>
+      <div className="card" style={{ padding: 16 }} ref={scatterCardRef}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 14 }}>
           <div>
             <h2 style={{ margin: 0, fontSize: 15, fontWeight: 650 }}>Content activity vs demand outcomes</h2>
             <p style={{ margin: '3px 0 0', fontSize: 12.5, color: 'var(--text-muted)' }}>
-              Dashed = content signals (lead) · solid = demand outcomes (lag). {valueMode === 'indexed' ? 'Indexed to 100 at the first week so different units compare directly.' : 'Absolute units split across two axes.'}
+              {activeChartView === 'scatter' && scatterPair ? (
+                <>
+                  Scatter view: {METRICS[scatterPair.signalKey].label} vs {METRICS[scatterPair.demandKey].label}.
+                  {' '}{valueMode === 'indexed' ? 'Indexed values.' : 'Absolute units.'}
+                </>
+              ) : (
+                <>
+                  Dashed = content signals (lead) · solid = demand outcomes (lag).{' '}
+                  {valueMode === 'indexed' ? 'Indexed to 100 at the first week so different units compare directly.' : 'Absolute units split across two axes.'}
+                </>
+              )}
             </p>
           </div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            {scatterPair && (
+              <Segmented<ChartView> value={activeChartView} onChange={setChartView}
+                options={[{ label: 'Timeline', value: 'timeline' }, { label: 'Scatter', value: 'scatter' }]} />
+            )}
             <Segmented value={valueMode} onChange={setValueMode}
               options={[{ label: 'Indexed', value: 'indexed' }, { label: 'Absolute', value: 'absolute' }]} />
           </div>
@@ -105,7 +166,10 @@ export function TimelineView() {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 9, marginBottom: 12 }}>
           <SeriesChips title="Signals" keys={CONTENT_TOGGLES} />
-          <SeriesChips title="Demand" keys={DEMAND_TOGGLES} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
+            <SeriesChips title="Demand" keys={DEMAND_TOGGLES} />
+            <BrandedSearchDemandControl />
+          </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 6 }}>
@@ -117,7 +181,19 @@ export function TimelineView() {
           </span>
         </div>
 
-        <TimelineChart records={records} visibleKeys={visibleKeys} valueMode={valueMode} lag={effectiveLag} />
+        {activeChartView === 'scatter' && scatterPair ? (
+          <TimelineScatterChart
+            records={records}
+            signalKey={scatterPair.signalKey}
+            demandKey={scatterPair.demandKey}
+            valueMode={valueMode}
+            lag={effectiveLag}
+          />
+        ) : (
+          <TimelineChart records={records} visibleKeys={visibleKeys} valueMode={valueMode} lag={effectiveLag} />
+        )}
+
+        <ChartDataExport data={chartExportData} />
       </div>
 
       <InsightBanner insights={insights} />
