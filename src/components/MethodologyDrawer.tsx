@@ -18,6 +18,10 @@ const SECTIONS = [
     p: 'Confidence reflects correlation strength: High at |r| ≥ 0.60, Medium at ≥ 0.35, otherwise Low. Low confidence usually means no clear preceding content spike was found.',
   },
   {
+    h: 'Impact Forecast is an estimate, not a promise',
+    p: 'For each signal→demand pair we compare weekly bumps — each metric vs its own trailing 4-week baseline — at 0–4 week offsets, and fit a simple trend line through those pairs. The slope converts a bump size into an expected lift (a 90% likely range shows how scattered history is), and the offset with the strongest positive relationship is the forecast timing. With a short history a single unusual week can sway the estimate; treat forecasts as planning hints.',
+  },
+  {
     h: 'Data quality affects conclusions',
     p: 'Content comes from CSV (Podscribe, Mighty Scout, Grin); demand comes from Triple Whale and the Amazon revenue scorecard. Missing weeks, mapping errors or partial API responses reduce reliability — the source health row shows which feeds are live vs mock.',
   },

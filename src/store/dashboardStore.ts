@@ -6,7 +6,8 @@ import { buildLiveDataset } from '../services/dataService';
 import { fetchSheetsStatus, loadWeeklyRecordsFromGoogleSheet, syncGoogleSheets } from '../services/sheetsService';
 import type { LagWeek } from '../lib/correlation';
 
-export type TabId = 'timeline' | 'scorecard' | 'summary';
+export type TabId = 'timeline' | 'scorecard' | 'summary' | 'impact';
+export type BumpPct = 10 | 25 | 50;
 export type ValueMode = 'absolute' | 'indexed';
 export type LagSetting = LagWeek | 'auto';
 export type Theme = 'light' | 'dark';
@@ -45,6 +46,9 @@ interface DashboardState {
     lag: LagWeek;
     requestId: number;
   } | null;
+  impactSignalKey: MetricKey;
+  impactDemandKey: MetricKey;
+  impactBumpPct: BumpPct;
 
   bootstrap: () => Promise<void>;
   connectGoogleSheet: () => Promise<boolean>;
@@ -60,6 +64,9 @@ interface DashboardState {
   setBrandedSearchProduct: (product: BrandedSearchSelection) => void;
   setDateRange: (start: string, end: string) => void;
   toggleTheme: () => void;
+  setImpactSignal: (key: MetricKey) => void;
+  setImpactDemand: (key: MetricKey) => void;
+  setImpactBump: (pct: BumpPct) => void;
   focusScatterFromScorecard: (signalKey: MetricKey, demandKey: MetricKey, lag: LagWeek) => void;
   clearPendingScatterJump: () => void;
 }
@@ -110,6 +117,9 @@ export const useDashboard = create<DashboardState>((set, get) => ({
   lag: 0,
   visible: DEFAULT_VISIBLE,
   pendingScatterJump: null,
+  impactSignalKey: 'socialImpressions',
+  impactDemandKey: 'googleOrganicSessions',
+  impactBumpPct: 10,
 
   bootstrap: async () => {
     await get().connectLive();
@@ -299,6 +309,9 @@ export const useDashboard = create<DashboardState>((set, get) => ({
       };
     }),
   clearPendingScatterJump: () => set({ pendingScatterJump: null }),
+  setImpactSignal: (impactSignalKey) => set({ impactSignalKey }),
+  setImpactDemand: (impactDemandKey) => set({ impactDemandKey }),
+  setImpactBump: (impactBumpPct) => set({ impactBumpPct }),
   setDateRange: (start, end) => {
     set({ dateRange: { start, end } });
     void get().refresh();

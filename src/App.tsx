@@ -5,6 +5,7 @@ import { KpiStrip } from './components/KpiStrip';
 import { TimelineView } from './components/timeline/TimelineView';
 import { ScorecardView } from './components/scorecard/ScorecardView';
 import { SummaryView } from './components/summary/SummaryView';
+import { ImpactForecastView } from './components/impact/ImpactForecastView';
 import { MethodologyDrawer } from './components/MethodologyDrawer';
 import { CsvUploadModal } from './components/CsvUploadModal';
 import { ErrorState } from './components/common/ui';
@@ -14,6 +15,7 @@ const TABS: { id: TabId; label: string; hint: string }[] = [
   { id: 'timeline', label: 'Timeline', hint: 'How signals move over time' },
   { id: 'scorecard', label: 'Scorecard', hint: 'Channel-by-channel decisions' },
   { id: 'summary', label: 'Summary', hint: 'Plain-English executive read' },
+  { id: 'impact', label: 'Impact Forecast', hint: 'If a signal bumps, when and how much demand lifts' },
 ];
 
 export default function App() {
@@ -74,6 +76,7 @@ export default function App() {
               {activeTab === 'timeline' && <TimelineView />}
               {activeTab === 'scorecard' && <ScorecardView />}
               {activeTab === 'summary' && <SummaryView />}
+              {activeTab === 'impact' && <ImpactForecastView />}
             </div>
           </>
         )}

@@ -90,6 +90,7 @@ export function TimelineView() {
 
   useEffect(() => {
     if (!shouldForceScatter) return;
+    setChartView('scatter');
     requestAnimationFrame(() => {
       scatterCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });

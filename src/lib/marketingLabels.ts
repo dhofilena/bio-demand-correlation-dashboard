@@ -24,3 +24,17 @@ export const RELATIONSHIP_STRENGTH_LABELS: Record<Confidence, string> = {
   Medium: 'Some relationship',
   Low: 'Weak / no relationship',
 };
+
+/** Impact Forecast: when the lift should appear, in plain language. */
+export function liftTimingLabel(lag: number): string {
+  if (lag === 0) return 'the same week';
+  if (lag === 1) return 'about 1 week later';
+  return `about ${lag} weeks later`;
+}
+
+/** Compact lift timing for the week-by-week ripple columns. */
+export function liftTimingLabelShort(lag: number): string {
+  if (lag === 0) return 'Same week';
+  if (lag === 1) return '1 wk later';
+  return `${lag} wks later`;
+}
