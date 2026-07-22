@@ -28,3 +28,24 @@ export function weekStartInRange(weekStart: string, start: string, end: string):
   const max = mondayOf(end);
   return weekStart >= min && weekStart <= max;
 }
+
+/** Sunday that ended the week before the week containing `iso` (Mon–Sun weeks). */
+export function lastWeekSunday(fromIso?: string): string {
+  const ref = fromIso ?? new Date().toISOString().slice(0, 10);
+  const thisMonday = new Date(`${mondayOf(ref)}T00:00:00Z`);
+  thisMonday.setUTCDate(thisMonday.getUTCDate() - 1);
+  return thisMonday.toISOString().slice(0, 10);
+}
+
+function subtractCalendarMonths(iso: string, months: number): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCMonth(d.getUTCMonth() - months);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Default dashboard window: 2 calendar months ending on last week's Sunday, start on a Monday. */
+export function defaultDateRange(fromIso?: string): { start: string; end: string } {
+  const end = lastWeekSunday(fromIso);
+  const start = mondayOf(subtractCalendarMonths(end, 2));
+  return { start, end };
+}

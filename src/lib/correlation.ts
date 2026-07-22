@@ -1,4 +1,5 @@
 import type { Confidence, LagResult, MetricKey, WeeklyRecord } from '../types';
+import { CONTENT_KEYS, DEMAND_CHANNELS } from '../config/metrics';
 
 export const LAG_WEEKS = [0, 1, 2, 3, 4] as const;
 export type LagWeek = (typeof LAG_WEEKS)[number];
@@ -180,4 +181,17 @@ export function bestLeadingSignal(
     .filter((res) => res.r > 0.1);
   if (!results.length) return null;
   return results.reduce((acc, cur) => (cur.r > acc.r ? cur : acc));
+}
+
+/** Strongest content→demand pair across standard scorecard channels. */
+export function bestContentDemandPair(
+  records: WeeklyRecord[],
+  contentKeys: MetricKey[] = CONTENT_KEYS,
+  demandKeys: MetricKey[] = DEMAND_CHANNELS,
+): LagResult | null {
+  const candidates = demandKeys
+    .map((d) => bestLeadingSignal(records, d, contentKeys))
+    .filter((r): r is LagResult => r !== null);
+  if (!candidates.length) return null;
+  return candidates.reduce((a, b) => (b.r > a.r ? b : a));
 }

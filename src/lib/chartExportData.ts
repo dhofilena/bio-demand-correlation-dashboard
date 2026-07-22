@@ -42,6 +42,7 @@ export function buildTimelineChartExport(
     weekStart: r.weekStart,
     weekLabel: r.weekLabel,
     values: {} as Record<string, number | null>,
+    ...(valueMode === 'normalized' ? { plotPct: {} as Record<string, number | null> } : {}),
   }));
 
   for (const key of visibleKeys) {
@@ -56,10 +57,32 @@ export function buildTimelineChartExport(
     });
   }
 
+  if (valueMode === 'normalized') {
+    for (const key of visibleKeys) {
+      const nums = rows
+        .map((row) => row.values[key])
+        .filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+      if (nums.length === 0) continue;
+      const min = Math.min(...nums);
+      const max = Math.max(...nums);
+      const span = max - min;
+      for (const row of rows) {
+        const v = row.values[key];
+        if (v === null || v === undefined) {
+          row.plotPct![key] = null;
+          continue;
+        }
+        row.plotPct![key] = round(span === 0 ? 50 : ((v - min) / span) * 100, 2);
+      }
+    }
+  }
+
   return {
     chartType: 'timeline' as const,
     description:
-      'Weekly content signals (dashed) vs demand outcomes (solid). Demand series may be shifted earlier by lagWeeks to test a leading relationship.',
+      valueMode === 'normalized'
+        ? 'Weekly content signals (dashed) vs demand outcomes (solid). Each series is independently min–max scaled to 0–100% for overlay (plotPct); values are absolute units. Demand may be shifted earlier by lagWeeks.'
+        : 'Weekly content signals (dashed) vs demand outcomes (solid). Demand series may be shifted earlier by lagWeeks to test a leading relationship.',
     valueMode,
     lagWeeks: lag,
     lagNote:
@@ -80,7 +103,8 @@ export function buildScatterChartExport(
 ) {
   const signalDef = METRICS[signalKey];
   const demandDef = METRICS[demandKey];
-  const indexed = valueMode === 'indexed';
+  // Scatter has no overlay axis; treat Normalized like Indexed.
+  const indexed = valueMode === 'indexed' || valueMode === 'normalized';
   const signalSeries = buildSeries(records, signalKey);
   const demandSeries = buildSeries(records, demandKey);
 

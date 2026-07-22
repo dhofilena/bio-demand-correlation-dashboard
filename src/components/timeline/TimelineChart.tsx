@@ -36,6 +36,26 @@ function axisFor(key: MetricKey, records: WeeklyRecord[]): 'big' | 'small' {
   return max > 2000 ? 'big' : 'small';
 }
 
+/** Scale each series independently to 0–100% of its own min–max so shapes overlay. */
+function minMaxNormalize(rows: Row[], keys: MetricKey[]) {
+  for (const key of keys) {
+    const nums: number[] = [];
+    for (const row of rows) {
+      const v = row[key];
+      if (typeof v === 'number' && Number.isFinite(v)) nums.push(v);
+    }
+    if (nums.length === 0) continue;
+    const min = Math.min(...nums);
+    const max = Math.max(...nums);
+    const span = max - min;
+    for (const row of rows) {
+      const v = row[key];
+      if (typeof v !== 'number' || !Number.isFinite(v)) continue;
+      row[key] = span === 0 ? 50 : ((v - min) / span) * 100;
+    }
+  }
+}
+
 export function TimelineChart({ records, visibleKeys, valueMode, lag }: Props) {
   const { data, perKey, hasBig, hasSmall } = useMemo(() => {
     const seriesByKey = new Map(visibleKeys.map((k) => [k, buildSeries(records, k)]));
@@ -57,15 +77,21 @@ export function TimelineChart({ records, visibleKeys, valueMode, lag }: Props) {
       pts.forEach((p, i) => {
         const targetIndex = i - shift; // pull demand earlier to align with its leading signal
         if (targetIndex < 0 || targetIndex >= rows.length) return;
+        // Normalized mode min-maxes absolute values so shape (not index base) drives the overlay.
         const value = valueMode === 'indexed' ? p.indexed : p.value;
         rows[targetIndex][key] = value;
       });
+    }
+
+    if (valueMode === 'normalized') {
+      minMaxNormalize(rows, visibleKeys);
     }
 
     return { data: rows, perKey: seriesByKey, hasBig, hasSmall };
   }, [records, visibleKeys, valueMode, lag]);
 
   const indexed = valueMode === 'indexed';
+  const normalized = valueMode === 'normalized';
 
   const weekBands = useMemo(() => {
     const BLOCK = 4;
@@ -90,7 +116,18 @@ export function TimelineChart({ records, visibleKeys, valueMode, lag }: Props) {
           ))}
           <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" vertical={false} />
           <XAxis dataKey="weekLabel" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} tickLine={false} axisLine={{ stroke: 'var(--border)' }} />
-          {indexed ? (
+          {normalized ? (
+            <YAxis
+              domain={[0, 100]}
+              ticks={[0, 25, 50, 75, 100]}
+              tick={{ fontSize: 11, fill: 'var(--text-muted)' }}
+              tickLine={false}
+              axisLine={false}
+              width={42}
+              tickFormatter={(v) => `${v}%`}
+              label={{ value: 'Range (0–100%)', angle: -90, position: 'insideLeft', fontSize: 10, fill: 'var(--text-faint)' }}
+            />
+          ) : indexed ? (
             <YAxis tick={{ fontSize: 11, fill: 'var(--text-muted)' }} tickLine={false} axisLine={false} width={42}
               label={{ value: 'Index (base 100)', angle: -90, position: 'insideLeft', fontSize: 10, fill: 'var(--text-faint)' }} />
           ) : (
@@ -106,7 +143,7 @@ export function TimelineChart({ records, visibleKeys, valueMode, lag }: Props) {
           {visibleKeys.map((key) => {
             const def = METRICS[key];
             const isDemand = def.group === 'demand';
-            const axisId = indexed ? undefined : axisFor(key, records);
+            const axisId = indexed || normalized ? undefined : axisFor(key, records);
             const common = {
               dataKey: key,
               name: def.label,
@@ -114,7 +151,7 @@ export function TimelineChart({ records, visibleKeys, valueMode, lag }: Props) {
               connectNulls: true,
               dot: false,
               isAnimationActive: false,
-              ...(indexed ? {} : { yAxisId: axisId }),
+              ...(indexed || normalized ? {} : { yAxisId: axisId }),
             } as const;
             // Demand = solid lines (outcomes); content = lighter dashed area (signals).
             return isDemand ? (

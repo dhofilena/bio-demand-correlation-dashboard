@@ -49,7 +49,7 @@ interface ScatterPoint {
 export function TimelineScatterChart({ records, signalKey, demandKey, valueMode, lag }: Props) {
   const signalDef = METRICS[signalKey];
   const demandDef = METRICS[demandKey];
-  const indexed = valueMode === 'indexed';
+  const indexed = valueMode === 'indexed' || valueMode === 'normalized';
 
   const { points, r, r2, trendLine, trendAngle, trendSlope, tierCounts } = useMemo(() => {
     const signalSeries = buildSeries(records, signalKey);
@@ -235,7 +235,7 @@ function ScatterTooltip({
   const pt = payload[0].payload;
   const signalDef = METRICS[signalKey];
   const demandDef = METRICS[demandKey];
-  const indexed = valueMode === 'indexed';
+  const indexed = valueMode === 'indexed' || valueMode === 'normalized';
 
   return (
     <div className="card" style={{ padding: 10, boxShadow: 'var(--shadow-lg)', minWidth: 180 }}>

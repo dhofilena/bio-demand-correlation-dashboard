@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useDashboard, type LagSetting } from '../../store/dashboardStore';
-import { METRICS, METRIC_LIST, CONTENT_KEYS, DEMAND_CHANNELS, SOCIAL_SIGNAL_KEYS, PODSCRIBE_SIGNAL_KEYS, signalToggleLabel } from '../../config/metrics';
+import { METRICS, METRIC_LIST, DEMAND_CHANNELS, SOCIAL_SIGNAL_KEYS, PODSCRIBE_SIGNAL_KEYS, signalToggleLabel } from '../../config/metrics';
 import type { MetricKey } from '../../types';
-import { lagCorrelation, bestLeadingSignal, LAG_WEEKS } from '../../lib/correlation';
+import { lagCorrelation, bestContentDemandPair, LAG_WEEKS } from '../../lib/correlation';
 import { generateInsights } from '../../lib/insightEngine';
 import { TimelineChart } from './TimelineChart';
 import { TimelineScatterChart } from './TimelineScatterChart';
@@ -99,11 +99,8 @@ export function TimelineView() {
 
   // Auto-detect the strongest content→demand lead across the standard pairs.
   const auto = useMemo(() => {
-    const candidates = DEMAND_CHANNELS
-      .map((d) => bestLeadingSignal(records, d, CONTENT_KEYS))
-      .filter((r): r is NonNullable<typeof r> => r !== null);
-    if (!candidates.length) return { lag: 0, label: 'no clear lead' };
-    const best = candidates.reduce((a, b) => (b.r > a.r ? b : a));
+    const best = bestContentDemandPair(records);
+    if (!best) return { lag: 0, label: 'no clear lead' };
     return {
       lag: best.bestLag,
       label: `${best.bestLag}w · ${METRICS[best.contentKey].short} → ${METRICS[best.demandKey].short} (r=${best.r.toFixed(2)})`,
@@ -145,12 +142,21 @@ export function TimelineView() {
               {activeChartView === 'scatter' && scatterPair ? (
                 <>
                   Scatter view: {METRICS[scatterPair.signalKey].label} vs {METRICS[scatterPair.demandKey].label}.
-                  {' '}{valueMode === 'indexed' ? 'Indexed values.' : 'Absolute units.'}
+                  {' '}
+                  {valueMode === 'absolute'
+                    ? 'Absolute units.'
+                    : valueMode === 'indexed'
+                      ? 'Indexed values.'
+                      : 'Indexed values (normalized overlay is timeline-only).'}
                 </>
               ) : (
                 <>
                   Dashed = content signals (lead) · solid = demand outcomes (lag).{' '}
-                  {valueMode === 'indexed' ? 'Indexed to 100 at the first week so different units compare directly.' : 'Absolute units split across two axes.'}
+                  {valueMode === 'normalized'
+                    ? 'Each series scaled to its own min–max (0–100%) so shapes overlay regardless of magnitude.'
+                    : valueMode === 'indexed'
+                      ? 'Indexed to 100 at the first week so different units compare directly.'
+                      : 'Absolute units split across two axes.'}
                 </>
               )}
             </p>
@@ -161,7 +167,11 @@ export function TimelineView() {
                 options={[{ label: 'Timeline', value: 'timeline' }, { label: 'Scatter', value: 'scatter' }]} />
             )}
             <Segmented value={valueMode} onChange={setValueMode}
-              options={[{ label: 'Indexed', value: 'indexed' }, { label: 'Absolute', value: 'absolute' }]} />
+              options={[
+                { label: 'Normalized', value: 'normalized' },
+                { label: 'Indexed', value: 'indexed' },
+                { label: 'Absolute', value: 'absolute' },
+              ]} />
           </div>
         </div>
 

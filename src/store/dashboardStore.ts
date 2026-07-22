@@ -1,14 +1,15 @@
 import { create } from 'zustand';
 import type { BrandedSearchData, CsvConnection, MetricKey, SourceHealth, WeeklyRecord } from '../types';
-import { BRANDED_SEARCH_TOTAL } from '../config/metrics';
+import { BRANDED_SEARCH_TOTAL, METRICS } from '../config/metrics';
 import type { BrandedSearchSelection } from '../lib/brandedSearch';
 import { buildLiveDataset } from '../services/dataService';
 import { fetchSheetsStatus, loadWeeklyRecordsFromGoogleSheet, syncGoogleSheets } from '../services/sheetsService';
-import type { LagWeek } from '../lib/correlation';
+import { bestContentDemandPair, type LagWeek } from '../lib/correlation';
+import { defaultDateRange } from '../lib/dateRange';
 
 export type TabId = 'timeline' | 'scorecard' | 'summary' | 'impact';
 export type BumpPct = 10 | 25 | 50;
-export type ValueMode = 'absolute' | 'indexed';
+export type ValueMode = 'absolute' | 'indexed' | 'normalized';
 export type LagSetting = LagWeek | 'auto';
 export type Theme = 'light' | 'dark';
 
@@ -71,34 +72,28 @@ interface DashboardState {
   clearPendingScatterJump: () => void;
 }
 
-const DEFAULT_RANGE = { start: '2026-03-16', end: '2026-06-21' };
+const DEFAULT_RANGE = defaultDateRange();
 
-const DEFAULT_VISIBLE: Record<MetricKey, boolean> = {
-  influencerPosts: false,
-  profilePosted: true,
-  socialImpressions: true,
-  socialReach: true,
-  socialEngagement: true,
-  mediaPosted: true,
-  emv: true,
-  podcastImpressions: true,
-  podcastIpModellingRevenue: true,
-  podcastLastClickSales: true,
-  podcastIpSalesMultiplier: true,
-  googleOrganicSessions: true,
-  nonOrganicPageViews: false,
-  gaOrganicRevenue: false,
-  gaPaidRevenue: false,
-  gaSocialRevenue: false,
-  gaOtherRevenue: false,
-  amazonOrganicRevenue: false,
-  amazonPpcRevenue: false,
-  dtcRevenue: false,
-  brandedSearchVolume: false,
-  instagramPosts: false,
-  tiktokPosts: false,
-  podcastAdSpend: false,
-};
+const FALLBACK_SIGNAL: MetricKey = 'profilePosted';
+const FALLBACK_DEMAND: MetricKey = 'amazonOrganicRevenue';
+
+function allSeriesHidden(): Record<MetricKey, boolean> {
+  return Object.keys(METRICS).reduce((acc, key) => {
+    acc[key as MetricKey] = false;
+    return acc;
+  }, {} as Record<MetricKey, boolean>);
+}
+
+function visibilityForPair(signalKey: MetricKey, demandKey: MetricKey): Record<MetricKey, boolean> {
+  const next = allSeriesHidden();
+  next[signalKey] = true;
+  next[demandKey] = true;
+  return next;
+}
+
+let initialVisibleApplied = false;
+
+const DEFAULT_VISIBLE = allSeriesHidden();
 
 export const useDashboard = create<DashboardState>((set, get) => ({
   status: 'idle',
@@ -113,8 +108,8 @@ export const useDashboard = create<DashboardState>((set, get) => ({
   dateRange: DEFAULT_RANGE,
   theme: 'light',
   activeTab: 'timeline',
-  valueMode: 'indexed',
-  lag: 0,
+  valueMode: 'normalized',
+  lag: 'auto',
   visible: DEFAULT_VISIBLE,
   pendingScatterJump: null,
   impactSignalKey: 'socialImpressions',
@@ -241,14 +236,27 @@ export const useDashboard = create<DashboardState>((set, get) => ({
     set({ status: 'loading', error: null });
     try {
       const result = await buildLiveDataset(dateRange.start, dateRange.end, csvRecords);
-      set({
+      const next: Partial<DashboardState> = {
         status: 'ready',
         records: result.records,
         brandedSearch: result.brandedSearch,
         health: result.health,
         warning: result.warning,
         lastUpdated: new Date().toISOString(),
-      });
+      };
+
+      if (!initialVisibleApplied && result.records.length > 0) {
+        const best = bestContentDemandPair(result.records);
+        const signalKey = best?.contentKey ?? FALLBACK_SIGNAL;
+        const demandKey = best?.demandKey ?? FALLBACK_DEMAND;
+        next.visible = visibilityForPair(signalKey, demandKey);
+        next.impactSignalKey = signalKey;
+        next.impactDemandKey = demandKey;
+        next.lag = 'auto';
+        initialVisibleApplied = true;
+      }
+
+      set(next);
     } catch (err) {
       set({ status: 'error', error: err instanceof Error ? err.message : String(err) });
     }
@@ -288,26 +296,17 @@ export const useDashboard = create<DashboardState>((set, get) => ({
   toggleSeries: (key) => set((s) => ({ visible: { ...s.visible, [key]: !s.visible[key] } })),
   setBrandedSearchProduct: (brandedSearchProduct) => set({ brandedSearchProduct }),
   focusScatterFromScorecard: (signalKey, demandKey, lag) =>
-    set(() => {
-      const nextVisible = Object.keys(DEFAULT_VISIBLE).reduce((acc, key) => {
-        acc[key as MetricKey] = false;
-        return acc;
-      }, {} as Record<MetricKey, boolean>);
-      nextVisible[signalKey] = true;
-      nextVisible[demandKey] = true;
-
-      return {
-        activeTab: 'timeline',
+    set(() => ({
+      activeTab: 'timeline',
+      lag,
+      visible: visibilityForPair(signalKey, demandKey),
+      pendingScatterJump: {
+        signalKey,
+        demandKey,
         lag,
-        visible: nextVisible,
-        pendingScatterJump: {
-          signalKey,
-          demandKey,
-          lag,
-          requestId: Date.now() + Math.random(),
-        },
-      };
-    }),
+        requestId: Date.now() + Math.random(),
+      },
+    })),
   clearPendingScatterJump: () => set({ pendingScatterJump: null }),
   setImpactSignal: (impactSignalKey) => set({ impactSignalKey }),
   setImpactDemand: (impactDemandKey) => set({ impactDemandKey }),
